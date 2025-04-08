@@ -1,6 +1,6 @@
 #include <Servo.h>
 
-Servo pina;
+Servo pinza;
 Servo giraPinza
 
 void setup() {
