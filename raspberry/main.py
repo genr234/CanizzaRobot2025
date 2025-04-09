@@ -8,7 +8,7 @@ import threading
 #spike2 = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
 
 #ruote = MotorPair(, 'B')
-pinza_spike = Motor('C')
+#pinza_spike = Motor('C')
 """
 colore1 = None
 colore2 = None
