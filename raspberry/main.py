@@ -6,9 +6,6 @@ import threading
 
 arudino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
 #spike2 = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
-
-hat = BuildHAT()
-print("Firmware version:", hat.getprompt(), )
 #ruote = MotorPair('A', 'B')
 #pinza_spike = Motor('C')
 """
