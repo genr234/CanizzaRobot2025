@@ -1,13 +1,15 @@
 import serial
 import time
-from buildhat import MotorPair, Motor
+from buildhat import MotorPair, Motor, BuildHAT
 import threading
 
 
 arudino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
 #spike2 = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
 
-ruote = MotorPair('A', 'B')
+hat = BuildHAT()
+print("Firmware version:", hat.getprompt(), )
+#ruote = MotorPair('A', 'B')
 #pinza_spike = Motor('C')
 """
 colore1 = None
