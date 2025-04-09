@@ -5,7 +5,7 @@ import threading
 
 
 arudino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
-#spike = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
+#spike2 = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
 
 ruote = MotorPair('A', 'B')
 pinza_spike = Motor('C')
