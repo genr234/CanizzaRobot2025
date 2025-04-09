@@ -6,8 +6,8 @@ import threading
 
 arudino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
 #spike2 = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
-ruote = MotorPair('A', 'B')
-#pinza_spike = Motor('C')
+#ruote = MotorPair('A', 'B')
+pinza_spike = Motor('C')
 """
 colore1 = None
 colore2 = None
@@ -59,3 +59,5 @@ read_from_spike_thread = threading.Thread(target=recive_to_spike(), daemon=True)
 read_from_spike_thread.start()
 """
 print("ciao")
+pinza_spike.run_for_seconds(2)
+print("Ciaop")
