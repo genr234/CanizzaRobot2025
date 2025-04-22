@@ -106,70 +106,85 @@ String rilevaColore() {
   }
 }
 
-void updateRGB2() {
-  red2 = green2 = blue2 = clear2 = 0;
-
-  for (int i = 0; i < 5; i++) {
-    digitalWrite(S2_2_PIN, LOW);
-    digitalWrite(S3_2_PIN, LOW);
-    red2 += pulseIn(OUT_2_PIN, LOW);
-    delay(1);
-
-    digitalWrite(S2_2_PIN, HIGH);
-    digitalWrite(S3_2_PIN, LOW);
-    clear2 += pulseIn(OUT_2_PIN, LOW);
-    delay(1);
-
-    digitalWrite(S2_2_PIN, HIGH);
-    digitalWrite(S3_2_PIN, HIGH);
-    green2 += pulseIn(OUT_2_PIN, LOW);
-    delay(1);
-
-    digitalWrite(S2_2_PIN, LOW);
-    digitalWrite(S3_2_PIN, HIGH);
-    blue2 += pulseIn(OUT_2_PIN, LOW);
-    delay(1);
+int readColorMode2(char color) {
+  int samples[6];
+  for (int i = 0; i < 6; i++) {
+    switch(color) {
+      case 'R': 
+        digitalWrite(S2_2_PIN, LOW);  
+        digitalWrite(S3_2_PIN, LOW);  
+        break;
+      case 'C': // Clear
+        digitalWrite(S2_2_PIN, HIGH); 
+        digitalWrite(S3_2_PIN, LOW);  
+        break;
+      case 'G': 
+        digitalWrite(S2_2_PIN, HIGH); 
+        digitalWrite(S3_2_PIN, HIGH); 
+        break;
+      case 'B': 
+        digitalWrite(S2_2_PIN, LOW);  
+        digitalWrite(S3_2_PIN, HIGH); 
+        break;
+    }
+    samples[i] = pulseIn(OUT_2_PIN, LOW, 5000); // Timeout di 5000 microsecondi
   }
+  int modeVal = samples[0];
+  int maxCount = 1;
+  for (int i = 0; i < 6; i++) {
+    int count = 1;
+    for (int j = i + 1; j < 6; j++) {
+      if (samples[j] == samples[i]) count++;
+    }
+    if (count > maxCount) {
+      maxCount = count;
+      modeVal = samples[i];
+    }
+  }
+  return modeVal;
+}
 
-  red2 /= 5;
-  green2 /= 5;
-  blue2 /= 5;
-  clear2 /= 5;
+void updateRGB2() {
+  red2 = readColorMode2('R');
+  clear2 = readColorMode2('C');
+  green2 = readColorMode2('G');
+  blue2 = readColorMode2('B');
 }
 
 String getColor2() {
   if (clear2 > NESSUN_OGGETTO_THRESHOLD_2) {
-    return "0"; //SCONOSCIUTO
+    return "0"; // Nessun oggetto
   }
 
   float R_G = (float)red2 / green2;
   float G_B = (float)green2 / blue2;
   float B_R = (float)blue2 / red2;
 
+  // Soglie vanno calibrate in base alla moda
   if (R_G > 0.75 && R_G < 1.1 &&
       G_B > 0.9 && G_B < 1.4 &&
       B_R > 0.75 && B_R < 1.5 &&
       clear2 <= WHITE_THRESHOLD_2) {
-    return "1"; //BIANCO
+    return "1"; // BIANCO
   }
 
   if (R_G <= 0.8 && G_B >= 1.1 && G_B <= 1.4 && B_R >= 1.2) {
-    return "2"; //ROSSO
+    return "2"; // ROSSO
   }
 
   if (R_G > 0.9 && G_B < 1.2 && B_R < 1.45) {
-    return "4"; //VERDE
+    return "4"; // VERDE
   }
 
   if (R_G >= 0.9 && G_B >= 1.2 && B_R < 0.8) {
-    return "5"; //BLU
+    return "5"; // BLU
   }
 
   if (R_G >= 0.7 && G_B < 1.2 && B_R >= 1) {
-    return "6"; //GIALLO
+    return "6"; // GIALLO
   }
 
-  return "0"; //SCONOSCIUTO
+  return "0"; // SCONOSCIUTO
 }
 
 String distanza(){
