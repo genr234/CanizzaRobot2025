@@ -1,24 +1,40 @@
 import queue
 import threading
-from enum import Enum
 from time import time, sleep
 import serial
+from colorama import Fore, Style, init as colorama_init
+from SensorErrorType import SensorErrorType
+from SensorError import SensorError
+
+# Inizializzazione colorama per colori cross-platform
+colorama_init(autoreset=True)
+
+# Configurazione colori per logging
+COLORI_LOG = {
+    "DEBUG": Fore.CYAN,
+    "INFO": Fore.GREEN,
+    "WARN": Fore.YELLOW,
+    "ERROR": Fore.RED,
+    "CRITICAL": Fore.RED + Style.BRIGHT,
+    "SERVO": Fore.MAGENTA  # Colore speciale per operazioni servo
+}
 
 
-class SensorErrorType(Enum):
-    TIMEOUT = 1
-    COMMUNICATION = 2
-    INVALID_DATA = 3
+def log(msg: str, level: str = "INFO"):
+    """Registra messaggi formattati con colori completi
 
-
-class SensorError(Exception):
-    def __init__(self, error_type: SensorErrorType, message: str):
-        self.error_type = error_type
-        self.message = message
-        super().__init__(message)
+    Args:
+        msg (str): Messaggio da loggare
+        level (str): Livello di gravità (DEBUG/INFO/WARN/ERROR/CRITICAL/SERVO)
+    """
+    ts = time()
+    colore = COLORI_LOG.get(level, COLORI_LOG["INFO"])
+    print(f"{colore}[{level}] {ts:.4f}: {msg}{Style.RESET_ALL}")
 
 
 class ServoMotor:
+    """Classe per il controllo avanzato di servomotori con gestione thread-safe"""
+
     def __init__(
             self,
             arduino_connection: serial.Serial,
@@ -29,6 +45,18 @@ class ServoMotor:
             timeout: float = 0.2,
             retries: int = 2
     ):
+        """
+        Inizializza il controller del servomotore.
+
+        Args:
+            arduino_connection (serial.Serial): Connessione seriale ad Arduino
+            shared_lock (threading.Lock): Mutex per operazioni thread-safe
+            command_code (str): Codice comando per il servomotore
+            min_angle (int): Angolo minimo consentito (default: 0)
+            max_angle (int): Angolo massimo consentito (default: 180)
+            timeout (float): Timeout risposta (secondi, default: 0.2)
+            retries (int): Tentativi prima di fallire (default: 2)
+        """
         self.arduino = arduino_connection
         self.lock = shared_lock
         self.command_code = command_code
@@ -36,83 +64,116 @@ class ServoMotor:
         self.max_angle = max_angle
         self.timeout = timeout
         self.retries = retries
-        self._current_angle = None
-        self._response_queue = queue.Queue()
-        self._running = threading.Event()
+        self._current_angle = None  # Ultimo angolo confermato
+        self._response_queue = queue.Queue()  # Coda messaggi non servo
+        self._running = threading.Event()  # Flag stato operativo
+
+        # Configurazione iniziale
         self._start_monitor()
+        log(f"Inizializzato servomotore {self.command_code} ({min_angle}-{max_angle}°)", "SERVO")
 
     def _send_command(self, angle: int):
-        """Invio comando con validazione angolo e gestione risposta"""
+        """Invio comando angolo con validazione e gestione errori avanzata
+
+        Args:
+            angle (int): Angolo target da impostare
+
+        Raises:
+            SensorError: In caso di errori di comunicazione o dati invalidi
+        """
+        # Validazione range angolo
         if not self.min_angle <= angle <= self.max_angle:
-            raise SensorError(
-                SensorErrorType.INVALID_DATA,
-                f"Angolo {angle} fuori range ({self.min_angle}-{self.max_angle})"
-            )
+            err_msg = f"Angolo {angle}° fuori range consentito ({self.min_angle}-{self.max_angle}°)"
+            log(err_msg, "ERROR")
+            raise SensorError(SensorErrorType.INVALID_DATA, err_msg)
 
         full_cmd = f"{self.command_code}|{angle}\n"
+        log(f"Invio comando: {full_cmd.strip()}", "DEBUG")
 
-        for attempt in range(self.retries):
+        for attempt in range(1, self.retries + 1):
             with self.lock:
                 try:
+                    # Pulizia buffer e invio comando
                     self.arduino.reset_output_buffer()
+                    start_write = time()
                     self.arduino.write(full_cmd.encode())
 
-                    start_time = time()
+                    # Monitoraggio performance scrittura
+                    write_time = time() - start_write
+                    if write_time > 0.02:
+                        log(f"Latenza scrittura elevata: {write_time:.3f}s", "WARN")
+
+                    # Lettura e interpretazione risposta
                     response_buffer = bytearray()
-                    servo_response_received = False
+                    start_time = time()
+                    response_received = False
+                    servo_status = None
 
                     while (time() - start_time) < self.timeout:
+                        # Lettura chunk non bloccante
                         chunk = self.arduino.read(self.arduino.in_waiting or 1)
                         if chunk:
                             response_buffer.extend(chunk)
                             lines = response_buffer.split(b'\n')
 
-                            # Mantieni dati parziali nel buffer
+                            # Conserva dati parziali
                             response_buffer = lines[-1]
 
+                            # Processa linee complete
                             for line in lines[:-1]:
                                 decoded_line = line.decode(errors='ignore').strip()
                                 if decoded_line.startswith("SERVO|"):
-                                    servo_response_received = True
-                                    status = decoded_line.split('|')[1]
-                                    if status == "OK":
-                                        self._current_angle = angle
-                                        return
-                                    elif status == "-1":
-                                        raise SensorError(
-                                            SensorErrorType.INVALID_DATA,
-                                            "Angolo non valido dal firmware"
-                                        )
+                                    response_received = True
+                                    parts = decoded_line.split('|')
+                                    servo_status = parts[1]
+                                    break
                                 elif decoded_line:
                                     self._response_queue.put_nowait(decoded_line)
 
-                        if servo_response_received:
+                        if response_received:
                             break
 
-                        # Gestione attesa adattiva
-                        elapsed = time() - start_time
-                        sleep(max(0.001, min(0.01, self.timeout - elapsed)))
+                        # Attesa adattiva per ridurre CPU usage
+                        sleep(max(0.001, self.timeout / 100))
 
-                    if not servo_response_received:
-                        raise SensorError(
-                            SensorErrorType.TIMEOUT,
-                            f"Timeout risposta servo (tentativo {attempt + 1})"
-                        )
+                    # Gestione risposta
+                    if servo_status == "OK":
+                        self._current_angle = angle
+                        log(f"Angolo {angle}° confermato", "SERVO")
+                        return
+                    elif servo_status == "-1":
+                        err_msg = f"Errore firmware per angolo {angle}°"
+                        log(err_msg, "ERROR")
+                        raise SensorError(SensorErrorType.INVALID_DATA, err_msg)
+                    else:
+                        log(f"Risposta non valida: {servo_status}", "WARN")
 
                 except serial.SerialException as e:
-                    if attempt == self.retries - 1:
+                    log(f"Errore comunicazione: {str(e)}", "ERROR")
+                    if attempt == self.retries:
                         raise SensorError(
                             SensorErrorType.COMMUNICATION,
-                            f"Errore comunicazione: {str(e)}"
+                            f"Fallo dopo {self.retries} tentativi: {str(e)}"
                         ) from e
-                    sleep(0.05 * (attempt + 1))
+                    sleep(0.1 * attempt)
+                except Exception as e:
+                    log(f"Errore generico: {str(e)}", "CRITICAL")
+                    raise
+
+            log(f"Tentativo {attempt} fallito, retry...", "WARN")
+
+        raise SensorError(SensorErrorType.TIMEOUT, f"Timeout dopo {self.retries} tentativi")
 
     def set_angle(self, angle: int, blocking: bool = True):
         """
-        Imposta angolo del servo
-        :param angle: Angolo target (0-180)
-        :param blocking: Se True attende completamento movimento
+        Imposta l'angolo del servomotore.
+
+        Args:
+            angle (int): Angolo target (0-180)
+            blocking (bool): Se True attende conferma movimento (default: True)
         """
+        log(f"Richiesta impostazione angolo {angle}° (blocking={blocking})", "INFO")
+
         if blocking:
             self._send_command(angle)
         else:
@@ -121,39 +182,53 @@ class ServoMotor:
                 args=(angle,),
                 daemon=True
             ).start()
+            log("Movimento non bloccante avviato", "DEBUG")
 
     def get_current_angle(self) -> int:
-        """Restituisce ultimo angolo confermato"""
-        return self._current_angle
+        """Restituisce l'ultimo angolo confermato dal servomotore"""
+        return self._current_angle or self.min_angle
 
     def _start_monitor(self):
-        """Avvia thread monitoraggio messaggi"""
+        """Avvia il thread di monitoraggio messaggi in background"""
         self._running.set()
-        self._monitor_thread = threading.Thread(target=self._monitor_responses)
-        self._monitor_thread.daemon = True
+        self._monitor_thread = threading.Thread(
+            target=self._monitor_responses,
+            daemon=True
+        )
         self._monitor_thread.start()
+        log("Thread monitoraggio messaggi avviato", "DEBUG")
 
     def _monitor_responses(self):
-        """Gestione messaggi non destinati al servo"""
+        """Monitoraggio continuo per messaggi non destinati al servo"""
+        log("Avvio monitoraggio messaggi...", "DEBUG")
         while self._running.is_set():
             try:
                 with self.lock:
                     if self.arduino.in_waiting > 0:
                         data = self.arduino.read_all().decode(errors='ignore')
                         for line in data.split('\n'):
-                            line = line.strip()
-                            if line and not line.startswith("SERVO|"):
-                                self._response_queue.put(line)
+                            clean_line = line.strip()
+                            if clean_line and not clean_line.startswith("SERVO|"):
+                                self._response_queue.put(clean_line)
+                                log(f"Messaggio non servo: {clean_line}", "DEBUG")
                 sleep(0.01)
-            except:
+            except Exception as e:
+                log(f"Errore monitoraggio: {str(e)}", "ERROR")
                 break
+        log("Monitoraggio messaggi terminato", "DEBUG")
 
     def shutdown(self):
         """Arresto sicuro del componente"""
+        log("Avvio procedura shutdown...", "SERVO")
         self._running.clear()
         if self._monitor_thread.is_alive():
             self._monitor_thread.join(timeout=0.5)
+            log("Thread monitoraggio terminato", "DEBUG")
+        log("Servomotore disattivato", "INFO")
 
     def get_queued_messages(self) -> list:
-        """Recupera messaggi non processati"""
-        return list(self._response_queue.queue)
+        """Restituisce i messaggi non processati"""
+        msgs = list(self._response_queue.queue)
+        if msgs:
+            log(f"Recuperati {len(msgs)} messaggi in coda", "DEBUG")
+        return msgs
