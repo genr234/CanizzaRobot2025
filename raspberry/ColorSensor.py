@@ -1,178 +1,127 @@
 import threading
 import serial
-from time import perf_counter, sleep
+from time import perf_counter, sleep, time
 from enum import Enum
 from typing import Optional
+from SensorError import SensorError
+from SensorErrorType import SensorErrorType
 
+# Logger minimale
 
-class SensorErrorType(Enum):
-    TIMEOUT = 1
-    COMMUNICATION = 2
-    INVALID_DATA = 3
-
-
-class SensorError(Exception):
-    def __init__(self, error_type: SensorErrorType, message: str):
-        self.error_type = error_type
-        self.message = message
-        super().__init__(message)
-
+def log(msg: str, level: str = "INFO"):
+    ts = time()
+    print(f"[{level}] {ts:.3f}: {msg}")
 
 class ColorSensor:
-    # Mappatura colori con codici esadecimali per debug
+    """
+    Lettura colore ultrarapida con retry continuo.
+    """
     COLOR_MAP = {
-        '0': ('Sconosciuto'),
-        '1': ('Bianco'),
-        '2': ('Rosso'),
-        '3': ('Scuro'),
-        '4': ('Verde'),
-        '5': ('Blu'),
-        '6': ('Giallo')
+        '0': 'sconosciuto',
+        '1': 'bianco',
+        '2': 'rosso',
+        '3': 'scuro',
+        '4': 'verde',
+        '5': 'blu',
+        '6': 'giallo'
     }
 
     def __init__(
-            self,
-            arduino_conn: serial.Serial,
-            lock: threading.Lock,
-            sensor_id: str,
-            command_code: str,
-            timeout: float = 0.8,
-            retries: int = 2,
-            baudrate: int = 115200
+        self,
+        arduino_conn: serial.Serial,
+        lock: threading.Lock,
+        sensor_id: str,
+        command_code: str,
+        timeout: float = 0.2,
+        retries: int = 2,
+        baudrate: int = 115200
     ):
         self.arduino = arduino_conn
         self.lock = lock
         self.sensor_id = sensor_id
-        self.command_code = f"{command_code}\n"  # Comando con terminatore
+        self.command_code = f"{command_code}\n"
         self.timeout = timeout
         self.retries = retries
         self.baudrate = baudrate
-        self._response_pattern = f"{self.sensor_id}|".encode()
-        self._line_buffer = bytearray()
-        self._last_color = (None, None)
+        self._pattern = f"{self.sensor_id}|".encode()
+        self._buffer = bytearray()
+        self._last = self.COLOR_MAP['0']
 
-        # Ottimizzazione parametri seriali
-        self.arduino.timeout = 0.01
-        self.arduino.write_timeout = 0.5
+        # Parametri seriali ultra-veloci
+        self.arduino.timeout = 0.005
+        self.arduino.write_timeout = 0.2
 
-    def _send_command(self) -> str:
-        """Core ad alta velocità per l'invio comandi e lettura risposte"""
-        for retry in range(self.retries):
+    def _send(self) -> str:
+        for attempt in range(1, self.retries + 1):
             with self.lock:
-                try:
-                    self.arduino.reset_input_buffer()
+                start = perf_counter()
+                self.arduino.reset_input_buffer()
+                self.arduino.write(self.command_code.encode())
+                write_dur = perf_counter() - start
+                if write_dur > 0.02:
+                    raise SensorError(SensorErrorType.COMMUNICATION, f"Write lento: {write_dur:.3f}s")
 
-                    # 1. Ottimizzazione invio comando
-                    command = self.command_code.encode()
-                    start_write = perf_counter()
-                    self.arduino.write(command)
-                    write_time = perf_counter() - start_write
+                # timeout dinamico
+                expect = len(self._pattern) + 2
+                dt = (10 * expect) / self.baudrate
+                to = self.timeout + dt
+                resp = self._read(to)
+                if resp and resp in self.COLOR_MAP:
+                    return resp
+                if resp:
+                    raise SensorError(SensorErrorType.INVALID_DATA, f"Invalido: {resp}")
 
-                    # Controllo prestazioni scrittura
-                    if write_time > 0.05:  # Soglia più stretta (50ms)
-                        raise SensorError(
-                            SensorErrorType.COMMUNICATION,
-                            f"Scrittura troppo lenta: {write_time:.3f}s"
-                        )
+            # backoff minimo
+            sleep(0.005 * attempt)
+        raise SensorError(SensorErrorType.TIMEOUT, "Timeout")
 
-                    # 2. Calcolo timeout corretto
-                    bytes_expected = len(self._response_pattern) + 2  # Pattern + valore + \n
-                    byte_time = (10 * bytes_expected) / self.baudrate  # 10 bit/byte (8N1)
-                    timeout = self.timeout + byte_time
-
-                    # 3. Lettura risposta con timeout dinamico
-                    response = self._read_response(timeout)
-
-                    # 4. Validazione risposta
-                    if response and response in self.COLOR_MAP:
-                        return response
-                    elif response:
-                        raise SensorError(
-                            SensorErrorType.INVALID_DATA,
-                            f"Valore non valido: {response}"
-                        )
-
-                except serial.SerialException as e:
-                    if retry == self.retries - 1:
-                        raise SensorError(
-                            SensorErrorType.COMMUNICATION,
-                            f"Errore seriale: {str(e)}"
-                        ) from e
-                    sleep(0.03 * (retry + 1))  # Backoff esponenziale
-
-        # 5. Reset del colore cache in caso di fallimento
-        self._last_color = (None, None)
-        raise SensorError(SensorErrorType.TIMEOUT, "Tentativi esauriti")
-
-    def _read_response(self, timeout: float) -> Optional[str]:
-        """Lettura ad alta efficienza con timeout preciso"""
+    def _read(self, timeout: float) -> Optional[str]:
         start = perf_counter()
-        self._line_buffer.clear()
-
-        while (perf_counter() - start) < timeout:
-            # Lettura chunk ottimizzato per dimensione
-            chunk = self.arduino.read(size=64)
+        self._buffer.clear()
+        while perf_counter() - start < timeout:
+            chunk = self.arduino.read(32)
             if chunk:
-                self._line_buffer.extend(chunk)
-                if b'\n' in self._line_buffer:
-                    lines = self._line_buffer.split(b'\n')
-                    self._line_buffer = lines[-1]  # Salva dati parziali
-
-                    for line in lines[:-1]:
-                        line = line.strip()
-                        if line.startswith(self._response_pattern):
-                            return line[len(self._response_pattern):].decode()
-
+                self._buffer.extend(chunk)
+                if b'\n' in self._buffer:
+                    parts = self._buffer.split(b'\n')
+                    self._buffer = parts[-1]
+                    for line in parts[:-1]:
+                        if line.startswith(self._pattern):
+                            return line[len(self._pattern):].decode().strip()
         return None
 
     def get_color(self) -> str:
-        """Restituisce (nome colore, esadecimale) con caching"""
-        try:
-            raw = self._send_command()
-            if raw and raw in self.COLOR_MAP:
-                self._last_color = self.COLOR_MAP[raw]
-                return self._last_color
-            return 'Sconosciuto'
-        except SensorError as e:
-            print(f"[{self.sensor_id}] Errore: {e.message}")
-            return self._last_color if self._last_color[0] else ('Sconosciuto', '#808080')
+        while True:
+            try:
+                code = self._send()
+                col = self.COLOR_MAP.get(code, self.COLOR_MAP['0'])
+                self._last = col
+                log(f"{self.sensor_id}: {col}", "INFO")
+                return col
+            except SensorError as e:
+                # retry immediato
+                sleep(0.005)
 
     def benchmark(self, samples: int = 10) -> dict:
-        """Test prestazioni con statistiche dettagliate"""
-        results = {
-            'success': 0,
-            'timeouts': 0,
-            'errors': 0,
-            'avg_time': 0,
-            'min_time': float('inf'),
-            'max_time': 0
-        }
-
-        total_time = 0
-
+        stats = { 'success':0, 'timeouts':0, 'errors':0, 'avg':0, 'min':float('inf'), 'max':0 }
+        tot = 0
         for _ in range(samples):
+            st = perf_counter()
             try:
-                start = perf_counter()
                 self.get_color()
-                elapsed = perf_counter() - start
-
-                results['success'] += 1
-                total_time += elapsed
-                results['min_time'] = min(results['min_time'], elapsed)
-                results['max_time'] = max(results['max_time'], elapsed)
-
+                d = perf_counter() - st
+                stats['success'] += 1
+                tot += d
+                stats['min'] = min(stats['min'], d)
+                stats['max'] = max(stats['max'], d)
             except SensorError as e:
                 if e.error_type == SensorErrorType.TIMEOUT:
-                    results['timeouts'] += 1
+                    stats['timeouts'] += 1
                 else:
-                    results['errors'] += 1
-
-        if results['success'] > 0:
-            results['avg_time'] = total_time / results['success']
-
-        return results
+                    stats['errors'] += 1
+        if stats['success']:
+            stats['avg'] = tot / stats['success']
+        return stats
 
     def adaptive_timeout(self, window_size: int = 20):
-        """Regolazione automatica timeout basata su risposte recenti"""
-        # Implementazione algoritmo adattivo (es. media mobile)
         pass

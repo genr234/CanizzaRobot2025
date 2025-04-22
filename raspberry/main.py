@@ -7,63 +7,52 @@ import serial
 from buildhat import MotorPair, Motor
 
 from ColorSensor import ColorSensor
-from SensorError import SensorError
 from ServoMotor import ServoMotor
 from UltrasonicSensor import UltrasonicSensor
 
-#Colori 0 - Sconosciuto | 1 - Bianco | 2 - Rosso | 3 - Scuro | 4 - Verde | 5 - Blu | 6 - Giallo
+# Configuration
+TEMPO_TIMER = 180         # secondi prima di shutdown
+SERIAL_PORT = '/dev/cu.usbmodem142201'
+BAUDRATE = 115200
+MAX_SERIAL_RETRIES = 5
+SERIAL_DELAY = 0.5         # secondi tra i tentativi
 
-TEMPO_TIMER = 180
-MAX_RETRIES = 10
-SERIAL_TIMEOUT = 1.5
-
+# Thread-safe serial lock & shutdown flag
 serial_lock = threading.Lock()
 shutdown_flag = threading.Event()
 
-def safe_serial_connect(port='/dev/cu.usbmodem142201', baud=115200, timeout=SERIAL_TIMEOUT):
-    """Connessione seriale con riprova incorporata e gestione generica"""
-    for attempt in range(1, MAX_RETRIES + 1):
+# Utility: log con timestamp
+
+def log(msg, level="INFO"):
+    ts = time()
+    print(f"[{level}] {ts:.3f}: {msg}")
+
+
+def safe_serial_connect(port=SERIAL_PORT, baud=BAUDRATE, timeout=1.5):
+    """Apre la connessione seriale, esce al fallimento dopo tentativi."""
+    for attempt in range(1, MAX_SERIAL_RETRIES + 1):
         try:
             ser = serial.Serial(port, baud, timeout=timeout)
-            print(f"[Serial] Connesso con successo (tentativo {attempt})")
+            log(f"Serial connessa su {port} (tentativo {attempt})")
             return ser
-        except serial.SerialException as e:
-            print(f"[Serial] Errore connessione (tentativo {attempt}): {e}")
         except Exception as e:
-            print(f"[Serial] Errore generico (tentativo {attempt}): {e}")
-        sleep(2)
-    print("[Serial] Connessione fallita dopo diversi tentativi, esco")
+            log(f"Impossibile connettersi ({e})", "WARN")
+            sleep(SERIAL_DELAY)
+    log("Seriale non disponibile, esco", "ERROR")
     sys.exit(1)
 
+# Connessione iniziale
 arduino = safe_serial_connect()
-color_sensor_1 = ColorSensor(arduino, serial_lock, "COL1", "5")
-color_sensor_2 = ColorSensor(arduino, serial_lock, "COL2", "6")
-ultrasonic_sensor = UltrasonicSensor(arduino, serial_lock, "DIST", "4")
+
+# Inizializza sensori e servo
+color1 = ColorSensor(arduino, serial_lock, "COL1", "5")
+color2 = ColorSensor(arduino, serial_lock, "COL2", "6")
+ultrasonic = UltrasonicSensor(arduino, serial_lock)
 servo = ServoMotor(arduino, serial_lock, "SERVO1")
-
-def safe_get_color(sensor):
-    try:
-        color = sensor.get_color()
-        print(f"[DEBUG] {sensor.sensor_id} risposta: {color}")  # Aggiungi debug
-        return color
-    except SensorError as e:
-        print(f"[ERR] {sensor.sensor_id}: {e.message}")
-        return "Sconosciuto"
-
-def safe_get_distance(sensor):
-    try:
-        return sensor.get_distance()
-    except SensorError as e:
-        print(f"[SAFE] Errore sensore {sensor.sensor_id}: {e.message}")
-        return "Sconosciuto"
-    except Exception as e:
-        print(f"[SAFE] Errore inaspettato get_color: {e}")
-        return "Sconosciuto"
 
 
 def restart_program():
-    """Riavvio sicuro con pulizia delle risorse"""
-    print("\n[System] Riavvio pulito in corso...")
+    log("Riavvio pulito in corso...", "SYSTEM")
     shutdown_flag.set()
     with serial_lock:
         try:
@@ -76,24 +65,8 @@ def restart_program():
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 
-def check_shutdown():
-    """Monitoraggio continuo per comandi di shutdown"""
-    while not shutdown_flag.is_set():
-        try:
-            with serial_lock:
-                data = arduino.read(100)
-                if b"SYS|3" in data:
-                    print("[System] Ricevuto comando di shutdown da Arduino")
-                    shutdown_flag.set()
-        except Exception as e:
-            print(f"[System] Errore monitor seriale: {e}")
-        sleep(0.01)
-    restart_program()
-
-
 def termina_programma():
-    """Shutdown immediato con priorità al riavvio"""
-    print("[System] Iniziando shutdown programmato...")
+    log("Timer scaduto, shutdown programmato", "SYSTEM")
     shutdown_flag.set()
     with serial_lock:
         try:
@@ -103,104 +76,150 @@ def termina_programma():
     restart_program()
 
 
+def check_shutdown():
+    """Thread che ascolta comando shutdown da Arduino"""
+    buffer = bytearray()
+    search_term = b"SYS|3"
+
+    while not shutdown_flag.is_set():
+        try:
+            with serial_lock:
+                # Leggi tutto il dato disponibile in un solo colpo
+                chunk = arduino.read(arduino.in_waiting or 1)
+
+            if chunk:
+                buffer.extend(chunk)
+
+                # Cerchiamo SYS|3 come messaggio completo
+                while b"\n" in buffer:
+                    line, _, buffer = buffer.partition(b"\n")
+                    if search_term in line:
+                        log("Ricevuto comando shutdown da Arduino", "SYSTEM")
+                        shutdown_flag.set()
+                        restart_program()
+                        return
+
+                # Limitiamo la dimensione del buffer
+                if len(buffer) > 300:
+                    buffer = buffer[-300:]
+            else:
+                sleep(0.005)  # Pausa breve per evitare uso intensivo della CPU
+        except Exception as e:
+            log(f"Errore monitor shutdown: {e}", "ERROR")
+
+    log("Shutdown attivato da flag, uscita da check_shutdown", "DEBUG")
+
+def read_until_success(callable_fn, *args, **kwargs):
+    """Invoca callable_fn finché non restituisce un valore o scatta shutdown."""
+    while not shutdown_flag.is_set():
+        try:
+            return callable_fn(*args, **kwargs)
+        except Exception as e:
+            name = getattr(callable_fn, '__name__', callable_fn.__class__.__name__)
+            log(f"Errore in funzione '{name}': {e}. Riprovo...", "WARN")
+            sleep(0.1)
+    log("Shutdown attivato, uscita da retry loop", "DEBUG")
+    restart_program()
+
+
 def handshake_arduino():
-    """Sincronizzazione iniziale con Arduino"""
-    print("[System] Handshake con Arduino...")
-    for attempt in range(1, MAX_RETRIES + 1):
+    log("Handshake con Arduino...", "SYSTEM")
+    while not shutdown_flag.is_set():
         try:
             with serial_lock:
                 arduino.reset_input_buffer()
-                arduino.write(b'1\n')  # Aggiunto newline
+                arduino.write(b'1\n')
                 arduino.flush()
                 response = arduino.read_until(b'SYS|1\n').decode().strip()
-
             if response == "SYS|1":
-                print(f"[System] Handshake riuscito (tentativo {attempt})")
+                log("Handshake riuscito", "SYSTEM")
                 return
-            else:
-                print(f"[System] Risposta inattesa: '{response}' (atteso SYS|1)")
-
+            log(f"Handshake risp inesperata: {response}", "WARN")
         except Exception as e:
-            print(f"[System] Errore handshake (tentativo {attempt}): {e}")
+            log(f"Errore handshake: {e}", "ERROR")
         sleep(0.5)
-    print("[System] Handshake fallito, riavvio")
     restart_program()
 
 
 def wait_for_start():
-    """Attesa robusta del comando start con buffer dedicato"""
-    print("[System] In attesa comando start...")
+    log("In attesa del comando START...", "SYSTEM")
     buffer = bytearray()
-    start_time = time()
-    COMMAND = b'SYS|2'
-    TIMEOUT = 15  # secondi
+    search_term = b"SYS|2"
+    start_ts = time()
+    TIMEOUT = 15
 
     while not shutdown_flag.is_set():
         try:
-            # 1. Lettura chunk con timeout
             with serial_lock:
                 chunk = arduino.read(arduino.in_waiting or 1)
-                if chunk:
-                    buffer.extend(chunk)
 
-                    # 2. Pulizia buffer (mantieni solo gli ultimi 100 bytes)
-                    if len(buffer) > 100:
-                        buffer = buffer[-100:]
+            if chunk:
+                buffer.extend(chunk)
 
-                    # 3. Ricerca efficiente del comando
-                    if COMMAND in buffer:
-                        print("[SUCCESS] Comando start ricevuto")
-                        buffer.clear()
+                # Analizza le linee complete
+                while b"\n" in buffer:
+                    line, _, buffer = buffer.partition(b"\n")
+                    if search_term in line:
+                        log("Comando START ricevuto", "SUCCESS")
                         return
 
-            # 4. Controllo timeout
-            if time() - start_time > TIMEOUT:
-                print(f"[ERROR] Timeout dopo {TIMEOUT}s. Buffer finale: {buffer.hex()}")
+                # Limitiamo il buffer
+                if len(buffer) > 300:
+                    buffer = buffer[-300:]
+            else:
+                sleep(0.005)
+
+            if time() - start_ts > TIMEOUT:
+                log("Timeout attesa START, riavvio", "ERROR")
                 restart_program()
-
-            # 5. Sleep ottimizzato
-
         except Exception as e:
-            print(f"[CRITICAL] Errore: {str(e)}")
+            log(f"Errore wait_for_start: {e}", "ERROR")
             restart_program()
 
+
 def main_execution():
-    """Logica operativa principale"""
-    print("[Main] Start routine principale")
+    log("Avvio routine principale", "SYSTEM")
     # Timer di emergenza
     timer = threading.Timer(TEMPO_TIMER, termina_programma)
     timer.daemon = True
     timer.start()
-    # Thread monitor shutdown
+    # Thread monitor
     monitor = threading.Thread(target=check_shutdown)
     monitor.daemon = True
     monitor.start()
 
-    servo.set_angle(120)
-    while True:
-        nome_colore = color_sensor_2.get_color()
-        print(f"Rilevato: {nome_colore}")
+    # Esempio angolo iniziale
+    read_until_success(servo.set_angle, 120)
 
-        print(f"Rilevato: {color_sensor_1.get_color()}")
+    # Ciclo infinito di lettura sensori
+    while not shutdown_flag.is_set():
+        """distance = ultrasonic.get_distance()
+        log(f"Colore2: {distance}", "DATA")
+        
+        colore1 = read_until_success(color1.get_color)
+        log(f"Colore1: {colore1}", "DATA")
+        
+        distanza = read_until_success(ultra.get_distance)
+        log(f"Distanza: {distanza}", "DATA")
 
-        print(f"Rilevato: {ultrasonic_sensor.get_distance()}")
-    sleep(150)
+        # Piccola pausa per alleggerire loop
+        sleep(0.05)"""
+
 
 
 def main():
-    """Funzione principale strutturata"""
     signal.signal(signal.SIGINT, lambda s, f: shutdown_flag.set())
     try:
         handshake_arduino()
         wait_for_start()
         main_execution()
     except Exception as e:
-        print(f"[System] Errore critico in main: {e}")
+        log(f"Errore critico: {e}", "ERROR")
         restart_program()
     finally:
         shutdown_flag.set()
         try:
-            color_sensor_2.shutdown()
+            color2.shutdown()
         except:
             pass
         with serial_lock:

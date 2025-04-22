@@ -89,20 +89,20 @@ int readColorMode(char color) {
   return modeVal;
 }
 
-void rilevaColore() {
+String rilevaColore() {
   int r = readColorMode('R');
   int g = readColorMode('G');
   int b = readColorMode('B');
 
   if (r < WHITE_THRESHOLD && g < WHITE_THRESHOLD && b < WHITE_THRESHOLD) {
-    Serial.println("COL1|1"); //BIANCO
+    return "1"; //BIANCO
   } else if (r < RED_THRESHOLD && g > RED_THRESHOLD && b > BLUE_THRESHOLD) {
-    Serial.println("COL1|2"); //ROSSO
+    return "2"; //ROSSO
   } else if ((r > DARK_THRESHOLD || g > DARK_THRESHOLD || b > DARK_THRESHOLD) && 
              (r < 140 || g < 140 || b < 140)) {
-    Serial.println("COL1|3"); //SCURO
+    return "3"; //SCURO
   } else {
-    Serial.println("COL1|0"); //SCONOSCIUTO
+    return "0"; //SCONOSCIUTO
   }
 }
 
@@ -172,56 +172,8 @@ String getColor2() {
   return "0"; //SCONOSCIUTO
 }
 
-void loop() {
-  if (!inizio) {
-    if (Serial.available() > 0) {
-      String input = Serial.readStringUntil('\n');  // Legge fino al newline
-      input.trim();
-      if (input == "1") {
-        digitalWrite(LED_ROSSO_PIN, HIGH);
-        inizio = true;
-        Serial.println("SYS|1");  // Aggiungi newline
-      }
-      return;
-    }
-  }
-
-  // Gestione pulsante con debounce non bloccante
-  int buttonState = digitalRead(BUTTON_PIN);
-  if (buttonState != lastButtonState) {
-    lastDebounceTime = millis();
-  }
-  
-  if ((millis() - lastDebounceTime) > debounceDelay) {
-    if (buttonState == HIGH && !buttonPressed) {
-      buttonPressed = true;
-      start = !start;
-      
-      if (start && inizio) {
-        servo.write(0);
-        digitalWrite(LED_VERDE_PIN, HIGH);
-        digitalWrite(LED_ROSSO_PIN, LOW);
-        Serial.println("SYS|2");  // Invia una sola volta
-      } else if (!start && inizio) {
-        digitalWrite(LED_VERDE_PIN, LOW);
-        digitalWrite(LED_ROSSO_PIN, LOW);
-        inizio = false;
-        Serial.println("SYS|3");
-      }
-    }
-    else if (buttonState == LOW && buttonPressed) {
-      buttonPressed = false;
-    }
-  }
-  lastButtonState = buttonState;
-
-  // Gestione comandi seriali
-  if (start && Serial.available() > 0) {
-    String cmd = Serial.readStringUntil('\n');
-    cmd.trim();
-
-    if (cmd == "4") {
-      // Lettura ultrasuoni con mediana
+String distanza(){
+  // Lettura ultrasuoni con mediana
       const int numReadings = 5;
       long readings[numReadings];
       
@@ -248,11 +200,68 @@ void loop() {
       }
 
       long dist = readings[numReadings / 2];
+      return String((dist >= 2 && dist <= 400) ? dist : 0);
+}
+
+void loop() {
+  if (!inizio) {
+    if (Serial.available() > 0) {
+      String input = Serial.readStringUntil('\n');  // Legge fino al newline
+      input.trim();
+      if (input == "1") {
+        digitalWrite(LED_ROSSO_PIN, HIGH);
+        inizio = true;
+        Serial.println("SYS|1");  // Aggiungi newline
+      } else if (input == "7"){
+          updateRGB2();
+          Serial.println("COL1|"+rilevaColore()+"|COL2|"+getColor2()+"|DISTANZA|"+distanza());
+          return;
+      }
+      return;
+    }
+  }
+
+  // Gestione pulsante con debounce non bloccante
+  int buttonState = digitalRead(BUTTON_PIN);
+  if (buttonState != lastButtonState) {
+    lastDebounceTime = millis();
+  }
+  
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    if (buttonState == HIGH && !buttonPressed) {
+      buttonPressed = true;
+      start = !start;
+      
+      if (start && inizio) {
+        servo.write(0);
+        digitalWrite(LED_VERDE_PIN, HIGH);
+        digitalWrite(LED_ROSSO_PIN, LOW);
+        Serial.println("SYS|2"); 
+      } else if (!start && inizio) {
+        digitalWrite(LED_VERDE_PIN, LOW);
+        digitalWrite(LED_ROSSO_PIN, LOW);
+        inizio = false;
+        while (true){
+         Serial.println("SYS|3"); 
+        }
+      }
+    }
+    else if (buttonState == LOW && buttonPressed) {
+      buttonPressed = false;
+    }
+  }
+  lastButtonState = buttonState;
+
+  if (start && Serial.available() > 0) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+
+    if (cmd == "4") {
       Serial.print("DIST|");
-      Serial.println((dist >= 2 && dist <= 400) ? dist : 0);
+      Serial.println(distanza());
     }
     else if (cmd == "5") {
-      rilevaColore();
+      Serial.println("COL1|"+rilevaColore());
     }
     else if (cmd == "6") {
       updateRGB2();

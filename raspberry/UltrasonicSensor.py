@@ -1,157 +1,147 @@
 import threading
 import serial
-from time import perf_counter, sleep
+from time import perf_counter, sleep, time
 from typing import Optional
+from SensorError import SensorError
+from SensorErrorType import SensorErrorType
 
-from ColorSensor import SensorErrorType, SensorError
+# Logger minimale
 
+def log(msg: str, level: str = "INFO"):
+    ts = time()
+    print(f"[{level}] {ts:.3f}: {msg}")
+
+shutdown_flag = threading.Event()
+
+def restart_program():
+    log("Restart del programma richiesto!", "CRITICAL")
+    raise SystemExit("Restart programmato")
+
+def read_until_success(callable_fn, *args, **kwargs):
+    """Invoca callable_fn finché non restituisce un valore o scatta shutdown."""
+    while not shutdown_flag.is_set():
+        try:
+            return callable_fn(*args, **kwargs)
+        except Exception as e:
+            name = getattr(callable_fn, '__name__', callable_fn.__class__.__name__)
+            log(f"Errore in funzione '{name}': {e}. Riprovo...", "WARN")
+            sleep(0.1)
+    log("Shutdown attivato, uscita da retry loop", "DEBUG")
+    restart_program()
 
 class UltrasonicSensor:
+    """
+    Lettura distanza ultrarapida con retry continuo.
+    """
     def __init__(
-            self,
-            arduino_conn: serial.Serial,
-            lock: threading.Lock,
-            sensor_id: str = "DIST",
-            command_code: str = "4",
-            timeout: float = 0.6,
-            retries: int = 3,
-            baudrate: int = 115200
+        self,
+        arduino_conn: serial.Serial,
+        lock: threading.Lock,
+        sensor_id: str = "DIST",
+        command_code: str = "4",
+        timeout: float = 0.2,
+        retries: int = 2,
+        baudrate: int = 115200
     ):
         self.arduino = arduino_conn
         self.lock = lock
         self.sensor_id = sensor_id
-        self.command_code = f"{command_code}\n"  # Comando con terminatore
+        self.command = f"{command_code}\n"
         self.timeout = timeout
         self.retries = retries
         self.baudrate = baudrate
-        self._response_pattern = f"{self.sensor_id}|".encode()
-        self._line_buffer = bytearray()
-        self._last_valid_distance = None
+        self._pattern = f"{self.sensor_id}|".encode()
+        self._buffer = bytearray()
+        self._last = -1
 
-        # Ottimizzazione parametri seriali
-        self.arduino.timeout = 0.02
-        self.arduino.write_timeout = 0.3
-        self.byte_time = 11 / self.baudrate  # 10 bit/byte + margine
+        # Parametri seriali ultraveloci
+        self.arduino.timeout = 0.005
+        self.arduino.write_timeout = 0.2
+        self._byte_time = 11 / self.baudrate
 
-    def _send_command(self) -> int:
-        """Core ad alta velocità con gestione protocollo robusta"""
-        for retry in range(self.retries):
+    def _send(self) -> int:
+        """Invia comando e prova un numero limitato di volte."""
+        for attempt in range(1, self.retries + 1):
             with self.lock:
+                start = perf_counter()
+                self.arduino.reset_input_buffer()
+                self.arduino.write(self.command.encode())
+                write_dur = perf_counter() - start
+                if write_dur > 0.02:
+                    raise SensorError(SensorErrorType.COMMUNICATION,
+                                      f"Write lento: {write_dur:.3f}s")
+
+                # Calcolo timeout dinamico
+                expect = len(self._pattern) + 6  # max digits + \n
+                to = self.timeout + expect * self._byte_time
+                resp = self._read(to)
+                if resp is None:
+                    continue
+
                 try:
-                    self.arduino.reset_input_buffer()
+                    value = int(resp)
+                    return value
+                except ValueError:
+                    raise SensorError(SensorErrorType.INVALID_DATA,
+                                      f"Output non intero: '{resp}'")
 
-                    # 1. Invio comando ottimizzato
-                    cmd = self.command_code.encode()
-                    self.arduino.write(cmd)
-
-                    # 2. Calcolo timeout dinamico
-                    expected_bytes = len(self._response_pattern) + 4  # VALORE + \n
-                    timeout = self.timeout + (expected_bytes * self.byte_time)
-
-                    # 3. Lettura risposta mirata
-                    response = self._read_response(timeout)
-                    if response is not None:
-                        return int(response)
-
-                except serial.SerialException as e:
-                    if retry == self.retries - 1:
-                        raise SensorError(
-                            SensorErrorType.COMMUNICATION,
-                            f"Errore comunicazione: {str(e)}"
-                        ) from e
-                    sleep(0.05 * (retry + 1))  # Backoff progressivo
-
+            sleep(0.005 * attempt)
         raise SensorError(SensorErrorType.TIMEOUT, "Tentativi esauriti")
 
-    def _read_response(self, timeout: float) -> Optional[str]:
-        """Lettura ad alta efficienza con buffer circolare"""
+    def _read(self, timeout: float) -> Optional[str]:
         start = perf_counter()
-        buffer = bytearray()
-
-        while (perf_counter() - start) < timeout:
-            # Lettura chunk ottimizzata
-            chunk = self.arduino.read_until(b'\n')
+        buf = self._buffer
+        buf.clear()
+        while perf_counter() - start < timeout:
+            chunk = self.arduino.read(32)
             if chunk:
-                buffer.extend(chunk)
-
-                # Ricerca pattern senza decodifica
-                if self._response_pattern in buffer:
-                    # Estrazione valore diretto
-                    try:
-                        line = buffer.split(b'\n')[0].decode().strip()
-                        return line.split('|')[1]
-                    except (IndexError, UnicodeDecodeError):
-                        pass
-
-                # Mantieni solo ultimi 128 bytes
-                if len(buffer) > 128:
-                    buffer = buffer[-128:]
-
-            # Controllo timeout adattivo
-            elapsed = perf_counter() - start
-            if elapsed < 0.01:
-                sleep(0.001)
-            else:
-                sleep(0.005)
-
+                buf.extend(chunk)
+                if b'\n' in buf:
+                    parts = buf.split(b'\n')
+                    buf[:] = parts[-1]
+                    for line in parts[:-1]:
+                        if line.startswith(self._pattern):
+                            try:
+                                return line.split(b'|',1)[1].decode().strip()
+                            except Exception as e:
+                                raise SensorError(SensorErrorType.INVALID_DATA, f"Parsing fallito: {e}")
         return None
 
     def get_distance(self) -> int:
-        """Restituisce (distanza, validità) con cache intelligente"""
-        try:
-            distance = self._send_command()
-            self._last_valid_distance = distance
-            return distance
-        except SensorError as e:
-            print(f"[{self.sensor_id}] Warn: {e.message}")
-            return -1
-
-    def adaptive_timeout(self, success_rate: float):
-        """Regolazione automatica timeout basata sullo storico"""
-        if success_rate > 0.8:
-            self.timeout = max(0.3, self.timeout * 0.9)
-        else:
-            self.timeout = min(1.5, self.timeout * 1.1)
+        """
+        Richiama _send in loop infinito finché non ottiene un valore valido.
+        """
+        while True:
+            try:
+                dist = self._send()
+                self._last = dist
+                log(f"{self.sensor_id}: {dist}", "INFO")
+                return dist
+            except SensorError as e:
+                log(f"{self.sensor_id}: {e.message}. Riprovo...", "ERROR")
+                sleep(0.005)
 
     def benchmark(self, samples: int = 20) -> dict:
-        """Test prestazioni completo con statistiche avanzate"""
-        stats = {
-            'success': 0,
-            'timeouts': 0,
-            'errors': 0,
-            'avg_time': 0.0,
-            'throughput': 0.0,
-            'jitter': 0.0
-        }
-
-        total_time = 0.0
-        last_time = 0.0
-        times = []
-
+        stats = { 'success':0, 'timeouts':0, 'errors':0, 'avg':0, 'min':float('inf'), 'max':0 }
+        tot = 0.0
         for _ in range(samples):
+            t0 = perf_counter()
             try:
-                start = perf_counter()
                 self.get_distance()
-                elapsed = perf_counter() - start
-
+                d = perf_counter() - t0
                 stats['success'] += 1
-                total_time += elapsed
-                times.append(elapsed)
-
-                # Calcolo jitter
-                if last_time > 0:
-                    stats['jitter'] += abs(elapsed - last_time)
-                last_time = elapsed
-
+                tot += d
+                stats['min'] = min(stats['min'], d)
+                stats['max'] = max(stats['max'], d)
             except SensorError as e:
                 if e.error_type == SensorErrorType.TIMEOUT:
                     stats['timeouts'] += 1
                 else:
                     stats['errors'] += 1
-
-        if stats['success'] > 0:
-            stats['avg_time'] = total_time / stats['success']
-            stats['throughput'] = 1 / stats['avg_time']
-            stats['jitter'] /= stats['success'] - 1 if stats['success'] > 1 else 1
-
+        if stats['success']:
+            stats['avg'] = tot / stats['success']
         return stats
+
+    def adaptive_timeout(self, window_size: int = 20):
+        # placeholder per algoritmo adattivo
+        pass
