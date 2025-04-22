@@ -1,0 +1,19 @@
+{
+    "serial_port": "/dev/cu.usbmodem142201",
+    "baudrate": 115200,
+    "command": "7",
+    "sensors": [
+        {
+            "keyword": "COL1",
+            "type": "color"
+        },
+        {
+            "keyword": "COL2",
+            "type": "color"
+        },
+        {
+            "keyword": "DISTANZA",
+            "type": "distance"
+        }
+    ]
+}
