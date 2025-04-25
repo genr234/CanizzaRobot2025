@@ -1,6 +1,7 @@
 import threading
 import serial
 from time import perf_counter, sleep, time
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 from colorama import Fore, Style, init as colorama_init  # Aggiunti per i colori
@@ -28,9 +29,9 @@ def log(msg: str, level: str = "INFO"):
         msg (str): Messaggio da loggare
         level (str): Livello di gravità (DEBUG/INFO/WARN/ERROR/CRITICAL/PERF)
     """
-    ts = time()
+    ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
     colore = COLORI_LOG.get(level, COLORI_LOG["INFO"])
-    print(f"{colore}[{level}] {ts:.4f}: {msg}{Style.RESET_ALL}")
+    print(f"{colore}[{level}] {ts}: {msg}{Style.RESET_ALL}")
 
 
 class ColorSensor:
@@ -148,14 +149,6 @@ class ColorSensor:
         raise SensorError(SensorErrorType.TIMEOUT, "Timeout dopo tutti i tentativi")
 
     def _read(self, timeout: float) -> Optional[str]:
-        """Lettura e parsing della risposta seriale.
-
-        Args:
-            timeout (float): Tempo massimo attesa risposta
-
-        Returns:
-            Optional[str]: Codice colore letto o None
-        """
         start = perf_counter()
         self._buffer.clear()
 
@@ -170,8 +163,12 @@ class ColorSensor:
                         self._buffer = lines[-1]  # Conserva dati incompleti
 
                         for line in lines[:-1]:
+                            if not line:
+                                continue  # Salta linee vuote
                             if line.startswith(self._pattern):
                                 decoded = line[len(self._pattern):].decode().strip()
+                                if not decoded:
+                                    log(f"Empty string: None", "DEBUG")  #Se fosse vuota scrive direttamente
                                 log(f"Raw response: {decoded}", "DEBUG")
                                 return decoded
             except Exception as e:
@@ -261,6 +258,34 @@ class ColorSensor:
         return stats
 
     def adaptive_timeout(self, window_size: int = 20):
-        """TODO: Implementare adattamento dinamico timeout"""
-        # Implementazione futura basata su dati storici
-        pass
+        """Algoritmo adattivo per impostare il timeout sulla base delle latenze storiche."""
+        latencies = []
+        sample_ok = 0
+
+        log(f"Avvio calcolo timeout adattivo su {window_size} letture...", "PERF")
+        for _ in range(window_size):
+            try:
+                start = perf_counter()
+                self._send()
+                latency = perf_counter() - start
+                latencies.append(latency)
+                sample_ok += 1
+                log(f"  Sample ok: {latency * 1000:.1f}ms", "PERF")
+            except SensorError:
+                log(f"  Lettura fallita", "WARN")
+                pass  # Ignora i fallimenti per questa stima
+
+        if latencies:
+            max_latency = max(latencies)
+            avg_latency = sum(latencies) / len(latencies)
+            suggested_timeout = max_latency + 0.02 #sempre millisecondi
+            log(
+                f"Timeout adattivo suggerito: {suggested_timeout * 1000:.1f} ms "
+                f"(avg: {avg_latency * 1000:.1f} ms, max: {max_latency * 1000:.1f} ms, successi: {sample_ok}/{window_size})",
+                "PERF"
+            )
+            self.timeout = suggested_timeout
+            return suggested_timeout
+        else:
+            log("Impossibile calcolare timeout adattivo: nessuna lettura valida.", "WARN")
+            return self.timeout

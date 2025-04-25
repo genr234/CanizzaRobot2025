@@ -5,6 +5,7 @@ import serial
 from colorama import Fore, Style, init as colorama_init
 from SensorErrorType import SensorErrorType
 from SensorError import SensorError
+from datetime import datetime
 
 # Inizializzazione colorama per colori cross-platform
 colorama_init(autoreset=True)
@@ -27,7 +28,7 @@ def log(msg: str, level: str = "INFO"):
         msg (str): Messaggio da loggare
         level (str): Livello di gravità (DEBUG/INFO/WARN/ERROR/CRITICAL/SERVO)
     """
-    ts = time()
+    ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
     colore = COLORI_LOG.get(level, COLORI_LOG["INFO"])
     print(f"{colore}[{level}] {ts:.4f}: {msg}{Style.RESET_ALL}")
 
@@ -186,7 +187,10 @@ class ServoMotor:
 
     def get_current_angle(self) -> int:
         """Restituisce l'ultimo angolo confermato dal servomotore"""
-        return self._current_angle or self.min_angle
+        if self._current_angle is not None:
+            return self._current_angle
+        else:
+            self.min_angle
 
     def _start_monitor(self):
         """Avvia il thread di monitoraggio messaggi in background"""

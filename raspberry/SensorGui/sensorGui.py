@@ -82,7 +82,11 @@ class SensorDashboard:
     def configure_styles(self):
         """Configura gli stili grafici per i widget"""
         style = ttk.Style()
-        style.theme_use('clam')  # Tema scuro
+        if 'clam' in style.theme_names():
+            style.theme_use('clam') #Tema scuro
+        else:
+            # Se non ci fosse usa il primo disponibile
+            style.theme_use(style.theme_names()[0])
         # Configurazione stili per diversi componenti
         style.configure('TFrame', background=self.colors['background'])
         style.configure('TLabel', background=self.colors['frame'], foreground=self.colors['text'])

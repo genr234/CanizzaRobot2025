@@ -5,6 +5,7 @@ from typing import Optional
 from colorama import Fore, Style, init as colorama_init  # Aggiunti per i colori
 from SensorError import SensorError
 from SensorErrorType import SensorErrorType
+from datetime import datetime
 
 # Inizializzazione colorama per colori cross-platform
 colorama_init(autoreset=True)
@@ -27,7 +28,7 @@ def log(msg: str, level: str = "INFO"):
         msg (str): Messaggio da loggare
         level (str): Livello di gravità (DEBUG/INFO/WARN/ERROR/CRITICAL/PERF)
     """
-    ts = time()
+    ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
     colore = COLORI_LOG.get(level, COLORI_LOG["INFO"])
     print(f"{colore}[{level}] {ts:.4f}: {msg}{Style.RESET_ALL}")
 
@@ -161,6 +162,8 @@ class UltrasonicSensor:
                         self._buffer = lines[-1]  # Conserva dati incompleti
 
                         for line in lines[:-1]:
+                            if not line:
+                                pass
                             if line.startswith(self._pattern):
                                 # Estrazione e pulizia valore
                                 parts = line.split(b'|', 1)
@@ -172,16 +175,22 @@ class UltrasonicSensor:
         log("Timeout lettura risposta", "WARN")
         return None
 
-    def get_distance(self) -> int:
+    def get_distance(self, max_attempts: int = 10) -> int:
         """Ottiene la distanza corrente con gestione errori trasparente.
+
+        Args:
+            max_attempts (int): Numero massimo di tentativi (default: 10, 0 = infinito)
 
         Returns:
             int: Distanza misurata in unità configurate
 
-        Note:
-            Esegue retry infiniti fino a lettura valida
+        Raises:
+            SensorError: Se max_attempts è raggiunto e ci sono ancora errori
         """
-        while True:
+        attempts = 0
+        last_error = None
+
+        while max_attempts == 0 or attempts < max_attempts:
             try:
                 start_time = perf_counter()
                 distance = self._send()
@@ -195,11 +204,19 @@ class UltrasonicSensor:
                 )
                 return distance
             except SensorError as e:
+                last_error = e
                 log(
                     f"Errore sensore {self.sensor_id}: {e.message}",
                     "ERROR"
                 )
+                attempts += 1
                 sleep(0.005)  # Prevenzione busy loop
+
+        # Se arrivassimo qui, vorrebbe dire che abbiamo superato max_attempts
+        if last_error:
+            raise last_error
+        # Caso molto improbabile, nessun errore && nessun valore
+        return self._last if self._last >= 0 else 0
 
     def benchmark(self, samples: int = 20) -> dict:
         """Esegue test prestazionali sul sensore.
@@ -261,6 +278,32 @@ class UltrasonicSensor:
         return stats
 
     def adaptive_timeout(self, window_size: int = 20):
-        """TODO: Implementare algoritmo adattivo timeout basato su letture recenti"""
-        # Idea: regolare timeout dinamicamente in base alle performance storiche
-        pass
+        """Algoritmo adattivo per impostare il timeout sulla base delle latenze storiche."""
+        # Array delle ultime N latenze
+        latencies = []
+        for _ in range(window_size):
+            try:
+                start = perf_counter()
+                self._send()
+                latency = perf_counter() - start
+                latencies.append(latency)
+                if len(latencies) > window_size:
+                    latencies.pop(0)
+            except SensorError:
+                pass  # Ignora fallimenti per questa stima
+
+        if latencies:
+            max_latency = max(latencies)
+            avg_latency = sum(latencies) / len(latencies)
+            suggested_timeout = max_latency + 0.02 #ms
+            log(
+                f"Timeout adattivo suggerito: "
+                f"{suggested_timeout * 1000:.1f} ms "
+                f"(avg: {avg_latency * 1000:.1f} ms, max: {max_latency * 1000:.1f} ms)",
+                "PERF"
+            )
+            self.timeout = suggested_timeout
+            return suggested_timeout
+        else:
+            log("Impossibile calcolare timeout adattivo: nessuna lettura valida.", "WARN")
+            return self.timeout

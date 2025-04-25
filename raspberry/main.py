@@ -3,7 +3,7 @@
 Programma di controllo per robot con Arduino
 Autore: Giulio Finocchiaro
 Versione: 1.1
-"""
+"""  #Avanzi va, pi sta vota l'autore lo lasciamo
 
 # Importazione librerie standard
 import signal
@@ -11,6 +11,7 @@ import threading
 import os
 import sys
 from time import sleep, time
+from datetime import datetime
 
 # Importazione librerie esterne
 import serial
@@ -66,10 +67,10 @@ def log(msg, level="INFO"):
         msg (str): Messaggio da registrare
         level (str): Livello di gravità (DEBUG/INFO/WARN/ERROR/SYSTEM/SUCCESS/DATA)
     """
-    ts = time()
+    ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
     colore = COLORI_LOG.get(level, COLORI_LOG["INFO"])
     reset = COLORI_LOG["RESET"]
-    print(f"{colore}[{level}] {ts:.3f}: {msg}{reset}")
+    print(f"{colore}[{level}] {ts}: {msg}{reset}")
 
 
 # ========================
@@ -167,6 +168,8 @@ def check_shutdown():
                 # Processa tutte le righe complete
                 while b"\n" in buffer:
                     line, _, buffer = buffer.partition(b"\n")
+                    if not line:
+                        log(f"Empty string: None | In check_shutdown", "DEBUG")
                     if target_message in line:
                         log("Ricevuto comando di shutdown remoto", "SYSTEM")
                         termina_programma()
@@ -222,6 +225,8 @@ def handshake_arduino():
                 arduino.flush()
                 response = arduino.read_until(b'SYS|1\n').decode().strip()
 
+            if not response:
+                log(f"Empty string: None | In handshake_arduino", "DEBUG")
             if response == "SYS|1":
                 log("Handshake completato con successo", "SUCCESS")
                 return
@@ -252,6 +257,8 @@ def wait_for_start():
                 # Cerca comando start
                 while b"\n" in buffer:
                     line, _, buffer = buffer.partition(b"\n")
+                    if not line:
+                        log(f"Empty string: None | In wait_for_start", "DEBUG")
                     if b"SYS|2" in line:
                         log("Ricevuto comando START", "SUCCESS")
                         return
@@ -301,6 +308,7 @@ def main_execution():
             sleep(0.1)
         except KeyboardInterrupt:
             shutdown_flag.set()
+            break # Salta un eventuale loop in più
 
 
 # ========================

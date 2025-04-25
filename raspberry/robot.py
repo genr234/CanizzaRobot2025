@@ -1,7 +1,7 @@
 from buildhat import MotorPair
 from typing import Union
 from colorama import Fore, Style, init as colorama_init
-import time
+from datetime import datetime
 
 # Inizializzazione colorama per colori cross-platform
 colorama_init(autoreset=True)
@@ -18,16 +18,17 @@ COLORI_LOG = {
 }
 
 
-def log(msg: str, level: str = "INFO"):
-    """Registra messaggi formattati con colori completi
+def log(msg, level="INFO"):
+    """Registra messaggi con timestamp e colori
 
     Args:
-        msg (str): Messaggio da loggare
-        level (str): Livello di gravità (DEBUG/INFO/WARN/ERROR/CRITICAL/ROBOT/CALIB)
+        msg (str): Messaggio da registrare
+        level (str): Livello di gravità (DEBUG/INFO/WARN/ERROR/SYSTEM/SUCCESS/DATA)
     """
-    ts = time.time()
+    ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
     colore = COLORI_LOG.get(level, COLORI_LOG["INFO"])
-    print(f"{colore}[{level}] {ts:.4f}: {msg}{Style.RESET_ALL}")
+    reset = COLORI_LOG["RESET"]
+    print(f"{colore}[{level}] {ts}: {msg}{reset}")
 
 
 class RobotError(Exception):
@@ -83,6 +84,9 @@ class Robot:
             speed (int|None): Velocità opzionale (0-100)
         """
         actual_speed = speed if speed is not None else self.default_speed
+        if not 0 <= actual_speed <= 100:
+            log(f"Velocità {actual_speed}% non valida", "ERROR")
+            raise ValueError("La velocità dev'essere tra 0 e 100")
         log(f"Avvio movimento in avanti a {actual_speed}%", "ROBOT")
         self.motor_ruote.start(actual_speed, actual_speed)
         self._is_moving = True
@@ -110,10 +114,11 @@ class Robot:
         Movimento controllato in avanti
 
         Args:
-            unit (str): Unità di misura ('degrees', 'seconds', 'rotations')
+            unit (str): Unità di misura ('degrees'=gradi, 'seconds'=secondi, 'rotations'=giri)
             value (float): Valore dell'unità
             speed (int|None): Velocità opzionale (0-100)
         """
+        #Così sappiamo quali unità di misura
         actual_speed = speed if speed is not None else self.default_speed
         log(f"Movimento in avanti di {value} {unit} a {actual_speed}%", "DEBUG")
         self._run_movement(value, actual_speed, unit, direction=1)
