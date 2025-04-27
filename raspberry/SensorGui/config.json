@@ -1,5 +1,5 @@
 {
-    "serial_port": "/dev/cu.usbmodem142201",
+    "serial_port": "/dev/cu.usbmodem1424201",
     "baudrate": 115200,
     "command": "7",
     "sensors": [

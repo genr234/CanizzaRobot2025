@@ -30,7 +30,7 @@ def log(msg: str, level: str = "INFO"):
     """
     ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
     colore = COLORI_LOG.get(level, COLORI_LOG["INFO"])
-    print(f"{colore}[{level}] {ts:.4f}: {msg}{Style.RESET_ALL}")
+    print(f"{colore}[{level}] {ts}: {msg}{Style.RESET_ALL}")
 
 
 class ServoMotor:
@@ -89,7 +89,6 @@ class ServoMotor:
             raise SensorError(SensorErrorType.INVALID_DATA, err_msg)
 
         full_cmd = f"{self.command_code}|{angle}\n"
-        log(f"Invio comando: {full_cmd.strip()}", "DEBUG")
 
         for attempt in range(1, self.retries + 1):
             with self.lock:
@@ -183,7 +182,6 @@ class ServoMotor:
                 args=(angle,),
                 daemon=True
             ).start()
-            log("Movimento non bloccante avviato", "DEBUG")
 
     def get_current_angle(self) -> int:
         """Restituisce l'ultimo angolo confermato dal servomotore"""
@@ -200,11 +198,9 @@ class ServoMotor:
             daemon=True
         )
         self._monitor_thread.start()
-        log("Thread monitoraggio messaggi avviato", "DEBUG")
 
     def _monitor_responses(self):
         """Monitoraggio continuo per messaggi non destinati al servo"""
-        log("Avvio monitoraggio messaggi...", "DEBUG")
         while self._running.is_set():
             try:
                 with self.lock:
@@ -214,12 +210,10 @@ class ServoMotor:
                             clean_line = line.strip()
                             if clean_line and not clean_line.startswith("SERVO|"):
                                 self._response_queue.put(clean_line)
-                                log(f"Messaggio non servo: {clean_line}", "DEBUG")
                 sleep(0.01)
             except Exception as e:
                 log(f"Errore monitoraggio: {str(e)}", "ERROR")
                 break
-        log("Monitoraggio messaggi terminato", "DEBUG")
 
     def shutdown(self):
         """Arresto sicuro del componente"""
@@ -227,12 +221,9 @@ class ServoMotor:
         self._running.clear()
         if self._monitor_thread.is_alive():
             self._monitor_thread.join(timeout=0.5)
-            log("Thread monitoraggio terminato", "DEBUG")
         log("Servomotore disattivato", "INFO")
 
     def get_queued_messages(self) -> list:
         """Restituisce i messaggi non processati"""
         msgs = list(self._response_queue.queue)
-        if msgs:
-            log(f"Recuperati {len(msgs)} messaggi in coda", "DEBUG")
         return msgs

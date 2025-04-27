@@ -135,7 +135,6 @@ class ColorSensor:
 
                 if resp:
                     if resp in self.COLOR_MAP:
-                        log(f"Lettura valida: {resp}", "DEBUG")
                         return resp
                     raise SensorError(
                         SensorErrorType.INVALID_DATA,
@@ -167,9 +166,6 @@ class ColorSensor:
                                 continue  # Salta linee vuote
                             if line.startswith(self._pattern):
                                 decoded = line[len(self._pattern):].decode().strip()
-                                if not decoded:
-                                    log(f"Empty string: None", "DEBUG")  #Se fosse vuota scrive direttamente
-                                log(f"Raw response: {decoded}", "DEBUG")
                                 return decoded
             except Exception as e:
                 log(f"Errore durante la lettura: {str(e)}", "ERROR")

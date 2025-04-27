@@ -30,7 +30,7 @@ def log(msg: str, level: str = "INFO"):
     """
     ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
     colore = COLORI_LOG.get(level, COLORI_LOG["INFO"])
-    print(f"{colore}[{level}] {ts:.4f}: {msg}{Style.RESET_ALL}")
+    print(f"{colore}[{level}] {ts}: {msg}{Style.RESET_ALL}")
 
 
 class UltrasonicSensor:
@@ -117,7 +117,6 @@ class UltrasonicSensor:
                         continue  # Prossimo tentativo
 
                     value = int(resp)
-                    log(f"Lettura raw: {resp} -> {value}", "DEBUG")
                     return value
 
                 except ValueError as ve:

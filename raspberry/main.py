@@ -3,7 +3,7 @@
 Programma di controllo per robot con Arduino
 Autore: Giulio Finocchiaro
 Versione: 1.1
-"""  #Avanzi va, pi sta vota l'autore lo lasciamo
+"""  #Avanzi va, pi sta vota l'autore lo lasciamo - Zitto Costa
 
 # Importazione librerie standard
 import signal
@@ -30,11 +30,11 @@ colorama_init(autoreset=True)
 # COSTANTI DI CONFIGURAZIONE
 # --------------------------
 TEMPO_TIMER = 180  # Durata timer sicurezza (secondi)
-SERIAL_PORT = '/dev/cu.usbmodem142201'
+SERIAL_PORT = '/dev/cu.usbmodem1424201'
 BAUDRATE = 115200
 MAX_SERIAL_RETRIES = 5
 SERIAL_DELAY = 0.5  # Pausa tra tentativi (secondi)
-TIMEOUT_START = 15  # Timeout attesa comando start (secondi)
+TIMEOUT_START = 5  # Timeout attesa comando start (secondi)
 
 # --------------------------
 # CONFIGURAZIONE LOGGER
@@ -109,6 +109,7 @@ try:
     color2 = ColorSensor(arduino, serial_lock, "COL2", "6")
     ultrasonic = UltrasonicSensor(arduino, serial_lock)
     servo = ServoMotor(arduino, serial_lock, "SERVO1")
+
 except Exception as e:
     log(f"Errore inizializzazione hardware: {str(e)}", "ERROR")
     sys.exit(1)
@@ -168,8 +169,6 @@ def check_shutdown():
                 # Processa tutte le righe complete
                 while b"\n" in buffer:
                     line, _, buffer = buffer.partition(b"\n")
-                    if not line:
-                        log(f"Empty string: None | In check_shutdown", "DEBUG")
                     if target_message in line:
                         log("Ricevuto comando di shutdown remoto", "SYSTEM")
                         termina_programma()
@@ -206,7 +205,6 @@ def retry_on_error(func, *args, **kwargs):
             log(f"Errore in {func.__name__}: {str(e)} - Riprovo...", "WARN")
             sleep(0.1)
 
-    log("Uscita forzata da retry loop", "DEBUG")
     restart_program()
 
 
@@ -225,8 +223,6 @@ def handshake_arduino():
                 arduino.flush()
                 response = arduino.read_until(b'SYS|1\n').decode().strip()
 
-            if not response:
-                log(f"Empty string: None | In handshake_arduino", "DEBUG")
             if response == "SYS|1":
                 log("Handshake completato con successo", "SUCCESS")
                 return
@@ -257,8 +253,6 @@ def wait_for_start():
                 # Cerca comando start
                 while b"\n" in buffer:
                     line, _, buffer = buffer.partition(b"\n")
-                    if not line:
-                        log(f"Empty string: None | In wait_for_start", "DEBUG")
                     if b"SYS|2" in line:
                         log("Ricevuto comando START", "SUCCESS")
                         return
@@ -296,14 +290,15 @@ def main_execution():
     safety_thread.start()
 
     # Configurazione iniziale servo
-    retry_on_error(servo.set_angle, 120)
+    """retry_on_error(servo.set_angle, 120)"""
 
     # Main loop
     while not shutdown_flag.is_set():
         # Esempio lettura sensori
         try:
-            distance = retry_on_error(ultrasonic.get_distance)
+            """distance = retry_on_error(ultrasonic.get_distance)"""
             color_value = retry_on_error(color1.get_color)
+            distance = retry_on_error(ultrasonic.get_distance)
             log(f"Distanza: {distance} | Colore: {color_value}", "DATA")
             sleep(0.1)
         except KeyboardInterrupt:
