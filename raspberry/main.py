@@ -30,7 +30,7 @@ colorama_init(autoreset=True)
 # COSTANTI DI CONFIGURAZIONE
 # --------------------------
 TEMPO_TIMER = 180  # Durata timer sicurezza (secondi)
-SERIAL_PORT = '/dev/ttyAMC0'
+SERIAL_PORT = '/dev/ttyACM0'
 BAUDRATE = 115200
 MAX_SERIAL_RETRIES = 5
 SERIAL_DELAY = 0.5  # Pausa tra tentativi (secondi)
