@@ -32,6 +32,12 @@ def git_clone(repo_url, local_path, branch):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
+    logging.info(f"Clonazione iniziale di {repo_url} in {local_path}")
+    result = subprocess.run(
+        ["git", "clone", "-b", branch, repo_url, local_path],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
     if result.returncode != 0:
         logging.error(f"Errore in git clone: {result.stderr.decode()}")
         raise Exception(f"Git clone fallito con codice {result.returncode}")
@@ -39,6 +45,13 @@ def git_clone(repo_url, local_path, branch):
         logging.info(f"Clonazione eseguita con successo in {local_path}")
 
 def git_pull(local_path):
+    logging.info(f"Eseguo git pull in {local_path}")
+    result = subprocess.run(
+        ["git", "pull"],
+        cwd=local_path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
     logging.info(f"Eseguo git pull in {local_path}")
     result = subprocess.run(
         ["git", "pull"],
@@ -72,6 +85,24 @@ def updater_loop(config):
         time.sleep(interval)
 
 def main():
+    parser = argparse.ArgumentParser(description="Daemon per aggiornare un repo GitHub")
+    parser.add_argument("config", help="Path al file di configurazione TOML")
+    args = parser.parse_args()
+
+    config = read_config(args.config)
+    setup_logging(config['log_file'])
+
+    if platform.system() == "Linux":
+        logging.info("Demonizzazione del processo su Linux...")
+        with daemon.DaemonContext(
+            stdout=open("/tmp/git_updater.out", "w+"),
+            stderr=open("/tmp/git_updater.err", "w+")
+        ):
+            # NON cambiamo working dir, ma passiamo il path in ogni comando
+            updater_loop(config)
+    else:
+        logging.info("Avvio in modalità normale su macOS...")
+        updater_loop(config)
     parser = argparse.ArgumentParser(description="Daemon per aggiornare un repo GitHub")
     parser.add_argument("config", help="Path al file di configurazione TOML")
     args = parser.parse_args()
