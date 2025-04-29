@@ -1,0 +1,5 @@
+repo_url = "https://github.com/genr234/homelab-homepage"
+local_path = "./example/"
+interval_seconds = 60
+log_file = "./test.log"
+branch = "main" # opzionale, se manca defaulta a "main"
