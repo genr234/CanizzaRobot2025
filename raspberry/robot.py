@@ -18,17 +18,16 @@ COLORI_LOG = {
 }
 
 
-def log(msg, level="INFO"):
-    """Registra messaggi con timestamp e colori
+def log(msg: str, level: str = "INFO"):
+    """Registra messaggi formattati con colori completi
 
     Args:
-        msg (str): Messaggio da registrare
-        level (str): Livello di gravità (DEBUG/INFO/WARN/ERROR/SYSTEM/SUCCESS/DATA)
+        msg (str): Messaggio da loggare
+        level (str): Livello di gravità (DEBUG/INFO/WARN/ERROR/CRITICAL/SERVO)
     """
     ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
     colore = COLORI_LOG.get(level, COLORI_LOG["INFO"])
-    reset = COLORI_LOG["RESET"]
-    print(f"{colore}[{level}] {ts}: {msg}{reset}")
+    print(f"{colore}[{level}] {ts}: {msg}{Style.RESET_ALL}")
 
 
 class RobotError(Exception):
