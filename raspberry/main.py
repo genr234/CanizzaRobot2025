@@ -314,7 +314,8 @@ def main_execution():
 
     coloreRic = ""
     print("Prova")
-    ruote.start
+    ruote.start(50, 50)
+    print("Prova1")
     """
     while True:
         coloreRic = coloreLego.get_color
