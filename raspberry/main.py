@@ -314,7 +314,7 @@ def main_execution():
 
     coloreRic = ""
     print("Prova")
-    ruote.start(50, 50)
+    Robot.muovi_avanti(speed=50)
     coloreRic = coloreLego.get_color
     print(coloreRic)
     print("Prova1")
@@ -328,7 +328,6 @@ def main_execution():
     robot.gira_sinistra
     """
     sleep(5)
-    ruote.stop
 
 
 
