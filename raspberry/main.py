@@ -17,6 +17,7 @@ from datetime import datetime
 import serial
 from colorama import Fore, Back, Style, init as colorama_init
 from buildhat import MotorPair, Motor
+import buildhat
 
 # Importazione moduli interni
 from ColorSensor import ColorSensor
@@ -112,6 +113,7 @@ try:
     color2 = ColorSensor(arduino, serial_lock, "COL2", "6")
     ultrasonic = UltrasonicSensor(arduino, serial_lock)
     servo = ServoMotor(arduino, serial_lock, "SERVO1")
+    coloreLego = buildhat.ColorSensor('A')
 
 except Exception as e:
     log(f"Errore inizializzazione hardware: {str(e)}", "ERROR")
@@ -313,12 +315,13 @@ def main_execution():
     coloreRic = ""
     robot.muovi_indietro
     while True:
-        coloreRic = retry_on_error(color2.get_color)
+        coloreRic = coloreLego.get_color
+        print(coloreRic)
         if coloreRic == "Giallo" or coloreRic == "Verde":
             break
 
     robot.gira_sinistra
-    
+
 
 
 
