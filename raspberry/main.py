@@ -23,6 +23,8 @@ from ColorSensor import ColorSensor
 from ServoMotor import ServoMotor
 from UltrasonicSensor import UltrasonicSensor
 
+from robot import Robot
+
 # Inizializzazione colori per logging
 colorama_init(autoreset=True)
 
@@ -100,6 +102,7 @@ def safe_serial_connect(port=SERIAL_PORT, baud=BAUDRATE, timeout=1.5):
 
 # Inizializza connessione seriale
 arduino = safe_serial_connect()
+robot = Robot('D', 'C')
 
 # ========================
 # INIZIALIZZAZIONE HARDWARE
@@ -292,11 +295,12 @@ def main_execution():
     # Configurazione iniziale servo
     """retry_on_error(servo.set_angle, 120)"""
 
+    """
     # Main loop
     while not shutdown_flag.is_set():
         # Esempio lettura sensori
         try:
-            """distance = retry_on_error(ultrasonic.get_distance)"""
+            distance = retry_on_error(ultrasonic.get_distance)
             color_value = retry_on_error(color1.get_color)
             distance = retry_on_error(ultrasonic.get_distance)
             log(f"Distanza: {distance} | Colore: {color_value}", "DATA")
@@ -304,6 +308,19 @@ def main_execution():
         except KeyboardInterrupt:
             shutdown_flag.set()
             break # Salta un eventuale loop in più
+    """
+
+    coloreRic = ""
+    robot.muovi_indietro
+    while True:
+        coloreRic = retry_on_error(color2.get_color)
+        if coloreRic == "Giallo" or coloreRic == "Verde":
+            break
+
+    robot.gira_sinistra
+    
+
+
 
 
 # ========================
