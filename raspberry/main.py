@@ -314,6 +314,7 @@ def main_execution():
 
     coloreRic = ""
     robot.muovi_indietro
+    """
     while True:
         coloreRic = coloreLego.get_color
         print(coloreRic)
@@ -321,7 +322,9 @@ def main_execution():
             break
 
     robot.gira_sinistra
-
+    """
+    sleep(5)
+    robot.stop_movimento
 
 
 
