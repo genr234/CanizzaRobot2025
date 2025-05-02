@@ -103,7 +103,7 @@ def safe_serial_connect(port=SERIAL_PORT, baud=BAUDRATE, timeout=1.5):
 
 # Inizializza connessione seriale
 arduino = safe_serial_connect()
-robot = Robot('D', 'C')
+ruote = MotorPair('C', 'D')
 
 # ========================
 # INIZIALIZZAZIONE HARDWARE
@@ -313,7 +313,8 @@ def main_execution():
     """
 
     coloreRic = ""
-    robot.muovi_indietro
+    print("Prova")
+    ruote.start
     """
     while True:
         coloreRic = coloreLego.get_color
@@ -324,8 +325,7 @@ def main_execution():
     robot.gira_sinistra
     """
     sleep(5)
-    robot.stop_movimento
-
+    ruote.stop
 
 
 
