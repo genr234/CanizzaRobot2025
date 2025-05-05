@@ -13,6 +13,7 @@ import sys
 from time import sleep, time
 from datetime import datetime
 
+import buildhat
 # Importazione librerie esterne
 import serial
 from colorama import Fore, Back, Style, init as colorama_init
@@ -21,8 +22,7 @@ from colorama import Fore, Back, Style, init as colorama_init
 from ColorSensorA import ColorSensorA
 from ServoMotor import ServoMotor
 from UltrasonicSensor import UltrasonicSensor
-from buildhat import Motor, ColorSensor
-import buildhat
+from buildhat import Motor
 
 from robot import Robot
 
@@ -120,7 +120,7 @@ except Exception as e:
     log(f"Errore inizializzazione hardware: {str(e)}", "ERROR")
     sys.exit(1)
 
-#coloreLego = buildhat.ColorSensor('B')
+coloreLego = buildhat.ColorSensor('B')
 robot = Robot('C', 'D')
 gabbia = Motor('A')
 
