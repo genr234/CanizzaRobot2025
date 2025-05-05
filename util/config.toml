@@ -1,0 +1,5 @@
+repo_url = "https://github.com/GiulioFinocchiaro/CanizzaRobot2025.git"
+local_path = "/Users/giuliofinocchiaro/Documents/Canizza/Canizza"
+interval_seconds = 60
+log_file = "./test.log"
+branch = "main" # opzionale, se manca defaulta a "main"
