@@ -44,13 +44,13 @@ class ColorSensorA:
     """
 
     COLOR_MAP = {
-        '0': 'sconosciuto',
-        '1': 'bianco',
-        '2': 'rosso',
-        '3': 'scuro',
-        '4': 'verde',
-        '5': 'blu',
-        '6': 'giallo'
+        '0': 'unknown',
+        '1': 'white',
+        '2': 'red',
+        '3': 'dark',
+        '4': 'green',
+        '5': 'blue',
+        '6': 'yellow'
     }
 
     def __init__(
