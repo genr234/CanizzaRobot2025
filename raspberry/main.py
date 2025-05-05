@@ -328,7 +328,8 @@ def main_execution():
     robot.gira_sinistra
     """
     sleep(5)
-    ruote.stop
+    #prova
+    ruote.stop()
 
 
 
