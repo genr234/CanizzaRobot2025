@@ -316,23 +316,21 @@ def main_execution():
             break # Salta un eventuale loop in più
     """
 
-    coloreRic = ""
-    print("Prova")
-    robot.gira_destra(20)
-    robot.muovi_avanti()
-    #coloreRic = coloreLego.get_color()
-    #print(coloreRic)
-    print("Prova1")
-    """
-    while True:
-        coloreRic = coloreLego.get_color
-        print(coloreRic)
-        if coloreRic == "Giallo" or coloreRic == "Verde":
-            break
-
-    robot.gira_sinistra
-    """
-    sleep(210)
+    try:
+        robot.gira_sinistra(50)
+        robot.gira_destra(20)
+        robot.muovi_indietro()
+        sleep(10)
+        robot.stop_movimento()
+        restart_program()
+    except KeyboardInterrupt:
+        log("Avvio shutdown da tastiera...", "SYSTEM")
+        shutdown_flag.set()
+        try:
+            with serial_lock:
+                arduino.write(b'3')  # Comando spegnimento Arduino
+        except Exception as e:
+            log(f"Errore invio comando shutdown: {str(e)}", "WARN")
 
 
 
@@ -345,7 +343,8 @@ def main():
 
     try:
         handshake_arduino()
-        wait_for_start()
+        #wait_for_start()
+        arduino.write(b'2')
         main_execution()
     except Exception as e:
         log(f"Errore critico: {str(e)}", "ERROR")
