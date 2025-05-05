@@ -5,10 +5,6 @@
 #define S3_1_PIN 9
 #define OUT_1_PIN 10
 
-// Definizione pin sensore colore 2
-#define S2_2_PIN 5
-#define S3_2_PIN 4
-#define OUT_2_PIN 3
 
 // Definizione pin sistema
 #define BUTTON_PIN 2
@@ -16,6 +12,8 @@
 #define LED_VERDE_PIN 12
 #define TRIG_ULTRASONIC_PIN 7
 #define ECHO_ULTRASONIC_PIN 6
+#define TRIG2_ULTRASONIC_PIN 4
+#define ECHO2_ULTRASONIC_PIN 5
 
 // Soglie primo sensore
 #define WHITE_THRESHOLD 60
@@ -28,6 +26,7 @@
 #define NESSUN_OGGETTO_THRESHOLD_2 17
 
 Servo servo;
+Servo servo2;
 
 // Variabili stato
 bool inizio = false;
@@ -50,18 +49,16 @@ void setup() {
   pinMode(S3_1_PIN, OUTPUT);
   pinMode(OUT_1_PIN, INPUT);
   
-  // Sensore colore 2
-  pinMode(S2_2_PIN, OUTPUT);
-  pinMode(S3_2_PIN, OUTPUT);
-  pinMode(OUT_2_PIN, INPUT);
-  
   // Sistema
   pinMode(LED_ROSSO_PIN, OUTPUT);
   pinMode(BUTTON_PIN, INPUT);
   pinMode(LED_VERDE_PIN, OUTPUT);
   pinMode(ECHO_ULTRASONIC_PIN, INPUT);
   pinMode(TRIG_ULTRASONIC_PIN, OUTPUT);
+  pinMode(ECHO2_ULTRASONIC_PIN, INPUT);
+  pinMode(TRIG2_ULTRASONIC_PIN, OUTPUT);
   servo.attach(11);
+  servo2.attach(3);
 }
 
 int readColorMode(char color) {
@@ -106,100 +103,19 @@ String rilevaColore() {
   }
 }
 
-int readColorMode2(char color) {
-  int samples[6];
-  for (int i = 0; i < 6; i++) {
-    switch(color) {
-      case 'R': 
-        digitalWrite(S2_2_PIN, LOW);  
-        digitalWrite(S3_2_PIN, LOW);  
-        break;
-      case 'C': // Clear
-        digitalWrite(S2_2_PIN, HIGH); 
-        digitalWrite(S3_2_PIN, LOW);  
-        break;
-      case 'G': 
-        digitalWrite(S2_2_PIN, HIGH); 
-        digitalWrite(S3_2_PIN, HIGH); 
-        break;
-      case 'B': 
-        digitalWrite(S2_2_PIN, LOW);  
-        digitalWrite(S3_2_PIN, HIGH); 
-        break;
-    }
-    samples[i] = pulseIn(OUT_2_PIN, LOW, 5000); // Timeout di 5000 microsecondi
-  }
-  int modeVal = samples[0];
-  int maxCount = 1;
-  for (int i = 0; i < 6; i++) {
-    int count = 1;
-    for (int j = i + 1; j < 6; j++) {
-      if (samples[j] == samples[i]) count++;
-    }
-    if (count > maxCount) {
-      maxCount = count;
-      modeVal = samples[i];
-    }
-  }
-  return modeVal;
-}
-
-void updateRGB2() {
-  red2 = readColorMode2('R');
-  clear2 = readColorMode2('C');
-  green2 = readColorMode2('G');
-  blue2 = readColorMode2('B');
-}
-
-String getColor2() {
-  if (clear2 > NESSUN_OGGETTO_THRESHOLD_2) {
-    return "0"; // Nessun oggetto
-  }
-
-  float R_G = (float)red2 / green2;
-  float G_B = (float)green2 / blue2;
-  float B_R = (float)blue2 / red2;
-
-  // Soglie vanno calibrate in base alla moda
-  if (R_G > 0.75 && R_G < 1.1 &&
-      G_B > 0.9 && G_B < 1.4 &&
-      B_R > 0.75 && B_R < 1.5 &&
-      clear2 <= WHITE_THRESHOLD_2) {
-    return "1"; // BIANCO
-  }
-
-  if (R_G <= 0.8 && G_B >= 1.1 && G_B <= 1.4 && B_R >= 1.2) {
-    return "2"; // ROSSO
-  }
-
-  if (R_G > 0.9 && G_B < 1.2 && B_R < 1.45) {
-    return "4"; // VERDE
-  }
-
-  if (R_G >= 0.9 && G_B >= 1.2 && B_R < 0.8) {
-    return "5"; // BLU
-  }
-
-  if (R_G >= 0.7 && G_B < 1.2 && B_R >= 1) {
-    return "6"; // GIALLO
-  }
-
-  return "0"; // SCONOSCIUTO
-}
-
-String distanza(){
+String distanza(int TRIG, int ECHO){
   // Lettura ultrasuoni con mediana
       const int numReadings = 5;
       long readings[numReadings];
       
       for (int i = 0; i < numReadings; i++) {
-        digitalWrite(TRIG_ULTRASONIC_PIN, LOW);
+        digitalWrite(TRIG, LOW);
         delayMicroseconds(2);
-        digitalWrite(TRIG_ULTRASONIC_PIN, HIGH);
+        digitalWrite(TRIG, HIGH);
         delayMicroseconds(10);
-        digitalWrite(TRIG_ULTRASONIC_PIN, LOW);
+        digitalWrite(TRIG, LOW);
 
-        readings[i] = pulseIn(ECHO_ULTRASONIC_PIN, HIGH, 30000) * 0.0343 / 2;
+        readings[i] = pulseIn(ECHO, HIGH, 30000) * 0.0343 / 2;
         delay(5);
       }
 
@@ -228,8 +144,7 @@ void loop() {
         inizio = true;
         Serial.println("SYS|1");  // Aggiungi newline
       } else if (input == "7"){
-          updateRGB2();
-          Serial.println("COL1|"+rilevaColore()+"|COL2|"+getColor2()+"|DISTANZA|"+distanza());
+          Serial.println("COL1|"+rilevaColore()+"|DIST2|"+distanza(TRIG2_ULTRASONIC_PIN, ECHO2_ULTRASONIC_PIN)+"|DISTANZA|"+distanza(TRIG_ULTRASONIC_PIN, ECHO_ULTRASONIC_PIN));
           return;
       }
       return;
@@ -273,21 +188,29 @@ void loop() {
 
     if (cmd == "4") {
       Serial.print("DIST|");
-      Serial.println(distanza());
+      Serial.println(distanza(TRIG2_ULTRASONIC_PIN, ECHO2_ULTRASONIC_PIN));
     }
     else if (cmd == "5") {
       Serial.println("COL1|"+rilevaColore());
     }
     else if (cmd == "6") {
-      updateRGB2();
-      Serial.print("COL2|");
-      Serial.println(getColor2());
+      Serial.print("DIST2|");
+      Serial.println(distanza(TRIG_ULTRASONIC_PIN, ECHO_ULTRASONIC_PIN));
     }
     else if (cmd.startsWith("SERVO1|")) {
       int angle = cmd.substring(7).toInt();
       
       if (angle >= 0 && angle <= 180) {
         servo.write(angle);
+        Serial.println("SERVO|OK");
+      } else {
+        Serial.println("SERVO|-1");
+      }
+    } else if (cmd.startsWith("SERVO2|")) {
+      int angle = cmd.substring(7).toInt();
+      
+      if (angle >= 0 && angle <= 360) {
+        servo2.write(angle);
         Serial.println("SERVO|OK");
       } else {
         Serial.println("SERVO|-1");

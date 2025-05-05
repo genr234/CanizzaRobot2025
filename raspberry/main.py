@@ -16,13 +16,12 @@ from datetime import datetime
 # Importazione librerie esterne
 import serial
 from colorama import Fore, Back, Style, init as colorama_init
-from buildhat import MotorPair, Motor
-import buildhat
 
 # Importazione moduli interni
-from ColorSensor import ColorSensor
+from ColorSensorA import ColorSensorA
 from ServoMotor import ServoMotor
 from UltrasonicSensor import UltrasonicSensor
+from buildhat import Motor, ColorSensor
 
 from robot import Robot
 
@@ -103,17 +102,21 @@ def safe_serial_connect(port=SERIAL_PORT, baud=BAUDRATE, timeout=1.5):
 
 # Inizializza connessione seriale
 arduino = safe_serial_connect()
-ruote = MotorPair('C', 'D')
 
 # ========================
 # INIZIALIZZAZIONE HARDWARE
 # ========================
 try:
-    color1 = ColorSensor(arduino, serial_lock, "COL1", "5")
-    color2 = ColorSensor(arduino, serial_lock, "COL2", "6")
+    color1 = ColorSensorA(arduino, serial_lock, "COL1", "5")
     ultrasonic = UltrasonicSensor(arduino, serial_lock)
+    ultrasonicLaterale = UltrasonicSensor(arduino, serial_lock, command_code="6", sensor_id="DIST2")
     servo = ServoMotor(arduino, serial_lock, "SERVO1")
-    coloreLego = buildhat.ColorSensor('A')
+    servo_alza = ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360)
+    coloreLego = ColorSensor('A')
+    robot = Robot('C', 'D')
+    gabbia = Motor('B')
+
+
 
 except Exception as e:
     log(f"Errore inizializzazione hardware: {str(e)}", "ERROR")
@@ -314,7 +317,7 @@ def main_execution():
 
     coloreRic = ""
     print("Prova")
-    ruote.start(50, 50)
+    robot.muovi_indietro()
     coloreRic = coloreLego.get_color()
     print(coloreRic)
     print("Prova1")
@@ -329,7 +332,7 @@ def main_execution():
     """
     sleep(5)
     #prova234
-    ruote.stop()
+    robot.stop_movimento()
 
 
 

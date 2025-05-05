@@ -34,7 +34,7 @@ def log(msg: str, level: str = "INFO"):
     print(f"{colore}[{level}] {ts}: {msg}{Style.RESET_ALL}")
 
 
-class ColorSensor:
+class ColorSensorA:
     """
     Classe per la lettura avanzata dei colori con gestione errori robusta,
     ottimizzata per bassa latenza e alta affidabilità.
