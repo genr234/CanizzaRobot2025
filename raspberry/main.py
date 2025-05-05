@@ -112,9 +112,6 @@ try:
     ultrasonicLaterale = UltrasonicSensor(arduino, serial_lock, command_code="6", sensor_id="DIST2")
     servo = ServoMotor(arduino, serial_lock, "SERVO1")
     servo_alza = ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360)
-    coloreLego = ColorSensor('A')
-    robot = Robot('C', 'D')
-    gabbia = Motor('B')
 
 
 
@@ -122,6 +119,9 @@ except Exception as e:
     log(f"Errore inizializzazione hardware: {str(e)}", "ERROR")
     sys.exit(1)
 
+coloreLego = ColorSensor('A')
+robot = Robot('C', 'D')
+gabbia = Motor('B')
 
 # ========================
 # FUNZIONI DI EMERGENZA
