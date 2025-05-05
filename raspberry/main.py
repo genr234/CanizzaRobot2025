@@ -319,6 +319,7 @@ def main_execution():
     coloreRic = ""
     print("Prova")
     robot.gira_destra(20)
+    robot.muovi_avanti()
     #coloreRic = coloreLego.get_color()
     #print(coloreRic)
     print("Prova1")
