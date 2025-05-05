@@ -120,7 +120,7 @@ except Exception as e:
     log(f"Errore inizializzazione hardware: {str(e)}", "ERROR")
     sys.exit(1)
 
-coloreLego = buildhat.ColorSensor('B')
+#coloreLego = buildhat.ColorSensor('B')
 robot = Robot('C', 'D')
 gabbia = Motor('A')
 
@@ -319,8 +319,8 @@ def main_execution():
     coloreRic = ""
     print("Prova")
     robot.muovi_indietro()
-    coloreRic = coloreLego.get_color()
-    print(coloreRic)
+    #coloreRic = coloreLego.get_color()
+    #print(coloreRic)
     print("Prova1")
     """
     while True:
