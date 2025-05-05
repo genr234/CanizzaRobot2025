@@ -22,6 +22,7 @@ from ColorSensorA import ColorSensorA
 from ServoMotor import ServoMotor
 from UltrasonicSensor import UltrasonicSensor
 from buildhat import Motor, ColorSensor
+import buildhat
 
 from robot import Robot
 
@@ -119,7 +120,7 @@ except Exception as e:
     log(f"Errore inizializzazione hardware: {str(e)}", "ERROR")
     sys.exit(1)
 
-coloreLego = ColorSensor('A')
+coloreLego = buildhat.ColorSensor('A')
 robot = Robot('C', 'D')
 gabbia = Motor('B')
 
