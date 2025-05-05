@@ -190,6 +190,12 @@ void loop() {
       Serial.print("DIST|");
       Serial.println(distanza(TRIG2_ULTRASONIC_PIN, ECHO2_ULTRASONIC_PIN));
     }
+    else if (cmd == "2"){
+      servo.write(0);
+      digitalWrite(LED_VERDE_PIN, HIGH);
+      digitalWrite(LED_ROSSO_PIN, LOW);
+      Serial.println("SYS|2");
+    }
     else if (cmd == "5") {
       Serial.println("COL1|"+rilevaColore());
     }
