@@ -22,7 +22,7 @@ from colorama import Fore, Back, Style, init as colorama_init
 from ColorSensorA import ColorSensorA
 from ServoMotor import ServoMotor
 from UltrasonicSensor import UltrasonicSensor
-from buildhat import Motor
+from buildhat import Motor, MotorPair
 
 from robot import Robot
 
@@ -121,7 +121,7 @@ except Exception as e:
     sys.exit(1)
 
 coloreLego = buildhat.ColorSensor('B')
-robot = Robot('C', 'D')
+ruote = MotorPair('C', 'D')
 gabbia = Motor('A')
 
 # ========================
@@ -318,7 +318,7 @@ def main_execution():
 
     coloreRic = ""
     print("Prova")
-    robot.gira_destra(20)
+    ruote._leftmotor.run_for_degrees(20)
     #coloreRic = coloreLego.get_color()
     #print(coloreRic)
     print("Prova1")
@@ -331,9 +331,6 @@ def main_execution():
 
     robot.gira_sinistra
     """
-    sleep(5)
-    #prova234
-    robot.stop_movimento()
 
 
 
