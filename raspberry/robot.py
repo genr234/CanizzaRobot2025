@@ -1,3 +1,5 @@
+from time import sleep
+
 from buildhat import MotorPair
 from typing import Union
 from colorama import Fore, Style, init as colorama_init
@@ -183,13 +185,21 @@ class Robot:
             raise RobotError(error_msg) from e
 
     def _turn(self, degrees: int, speed: int, right: bool = True):
-        """Gestore interno per rotazioni"""
+        """Gestore interno per rotazioni sul posto"""
         try:
             log(f"Avvio rotazione: {degrees}°", "DEBUG")
+
+            # Calcolo empirico del tempo per ruotare x gradi
+            # Es: 90° -> 1 secondo
+            duration = degrees / 90.0  # Assume 1s per 90°
+
             if right:
-                self.motor_ruote.run_for_degrees(degrees, speed, -speed)
+                self.motor_ruote.start_tank(speed, -speed)
             else:
-                self.motor_ruote.run_for_degrees(degrees, -speed, speed)
+                self.motor_ruote.start_tank(-speed, speed)
+
+            sleep(duration)
+            self.motor_ruote.stop()
             self._is_moving = False
             log("Rotazione completata", "DEBUG")
         except Exception as e:
