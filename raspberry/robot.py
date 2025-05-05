@@ -99,7 +99,7 @@ class Robot:
         """
         actual_speed = speed if speed is not None else self.default_speed
         log(f"Avvio movimento all'indietro a {actual_speed}%", "ROBOT")
-        self.motor_ruote.start(-actual_speed, -actual_speed)
+        self.motor_ruote.start(actual_speed, actual_speed)
         self._is_moving = True
 
     def stop_movimento(self):
