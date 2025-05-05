@@ -189,14 +189,13 @@ class Robot:
         try:
             log(f"Avvio rotazione: {degrees}°", "DEBUG")
 
-            # Calcolo empirico del tempo per ruotare x gradi
-            # Es: 90° -> 1 secondo
-            duration = degrees / 90.0  # Assume 1s per 90°
+            # Calcolo empirico del tempo (ad esempio: 0.01s per ogni grado)
+            duration = degrees * 0.01  # Puoi regolare questo valore
 
             if right:
-                self.motor_ruote.start_tank(speed, -speed)
+                self.motor_ruote.start(speed, -speed)
             else:
-                self.motor_ruote.start_tank(-speed, speed)
+                self.motor_ruote.start(-speed, speed)
 
             sleep(duration)
             self.motor_ruote.stop()
