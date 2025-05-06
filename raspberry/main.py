@@ -317,7 +317,7 @@ def main_execution():
     """
 
     try:
-        robot.gira_sinistra(50, -50)
+        robot.gira_sinistra(90, -50)
         robot.muovi_indietro_for("rotations", 0.5)
         #robot.gira_destra(40, 40)
         """
