@@ -319,9 +319,9 @@ def main_execution():
     try:
         #robot.gira_sinistra(90, 50)
         #robot.gira_destra(40, 40)
-        servo_gabbia.set_angle(180)
+        retry_on_error(servo_gabbia.set_angle, 179)
         sleep(3)
-        servo_gabbia.set_angle(0)
+        retry_on_error(servo_gabbia.set_angle, 1)
         gabbia.run_for_degrees(90, speed=-gabbia.default_speed)
     except KeyboardInterrupt:
         log("Avvio shutdown da tastiera...", "SYSTEM")
