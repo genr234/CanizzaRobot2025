@@ -57,8 +57,8 @@ void setup() {
   pinMode(TRIG_ULTRASONIC_PIN, OUTPUT);
   pinMode(ECHO2_ULTRASONIC_PIN, INPUT);
   pinMode(TRIG2_ULTRASONIC_PIN, OUTPUT);
-  servo.attach(11);
-  servo2.attach(3);
+  servo.attach(3);
+  servo2.attach(11);
 }
 
 int readColorMode(char color) {
@@ -182,6 +182,18 @@ void loop() {
   }
   lastButtonState = buttonState;
 
+  if (!start && Serial.available() > 0) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd == "2"){
+        servo.write(0);
+        digitalWrite(LED_VERDE_PIN, HIGH);
+        digitalWrite(LED_ROSSO_PIN, LOW);
+        Serial.println("SYS|2");
+        start = true;
+      }
+  }
+
   if (start && Serial.available() > 0) {
     String cmd = Serial.readStringUntil('\n');
     cmd.trim();
@@ -190,12 +202,6 @@ void loop() {
       Serial.print("DIST|");
       Serial.println(distanza(TRIG2_ULTRASONIC_PIN, ECHO2_ULTRASONIC_PIN));
     }
-    else if (cmd == "2"){
-      servo.write(0);
-      digitalWrite(LED_VERDE_PIN, HIGH);
-      digitalWrite(LED_ROSSO_PIN, LOW);
-      Serial.println("SYS|2");
-    }
     else if (cmd == "5") {
       Serial.println("COL1|"+rilevaColore());
     }
@@ -203,31 +209,33 @@ void loop() {
       Serial.print("DIST2|");
       Serial.println(distanza(TRIG_ULTRASONIC_PIN, ECHO_ULTRASONIC_PIN));
     }
-    else if (cmd.startsWith("SERVO1|")) {
-      int angle = cmd.substring(7).toInt();
-      
-      if (angle >= 0 && angle <= 360) {
-        servo.write(angle);
-        Serial.println("SERVO|OK");
-      } else {
-        Serial.println("SERVO|-1");
-      }
-    } else if (cmd.startsWith("SERVO2|")) {
-      int angle = cmd.substring(7).toInt();
-      
-      if (angle >= 0 && angle <= 180) {
-        servo2.write(angle);
-        Serial.println("SERVO|OK");
-      } else {
-        Serial.println("SERVO|-1");
-      }
+   else if (cmd.startsWith("SERVO1|")) {
+    int angle = cmd.substring(7).toInt();
+    
+    if (angle >= 0 && angle <= 180) {
+      servo.write(angle);
+      Serial.println("SERVO|OK");
+    } else {
+      Serial.println("SERVO|-1");
     }
-    else if (cmd == "3") {
-      start = false;
-      inizio = false;
-      digitalWrite(LED_VERDE_PIN, LOW);
-      digitalWrite(LED_ROSSO_PIN, LOW);
-      Serial.println("SYS|3");
+  } 
+  else if (cmd.startsWith("SERVO2|")) {
+    int angle = cmd.substring(7).toInt();
+    
+    if (angle >= 0 && angle <= 180) {  // 🔧 Sistemato il limite
+      servo2.write(angle);
+      Serial.println("SERVO|OK");
+    } else {
+      Serial.println("SERVO|-1");
+    }
+  }
+
+  else if (cmd == "3") {
+    start = false;
+    inizio = false;
+    digitalWrite(LED_VERDE_PIN, LOW);
+    digitalWrite(LED_ROSSO_PIN, LOW);
+    Serial.println("SYS|3");
     }
   }
 }

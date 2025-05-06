@@ -111,8 +111,8 @@ try:
     color1 = ColorSensorA(arduino, serial_lock, "COL1", "5")
     ultrasonic = UltrasonicSensor(arduino, serial_lock)
     ultrasonicLaterale = UltrasonicSensor(arduino, serial_lock, command_code="6", sensor_id="DIST2")
-    servo_alza = ServoMotor(arduino, serial_lock, "SERVO1")
-    servo_gabbia = ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360)
+    servo_gabbia = ServoMotor(arduino, serial_lock, "SERVO1")
+    servo_alza = ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360)
 
 
 
