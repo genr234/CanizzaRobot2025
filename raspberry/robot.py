@@ -116,10 +116,13 @@ class Robot:
             log(f"Avvio rotazione: {degrees}°", "DEBUG")
             duration = degrees * 0.01  # Regolabile
 
+            # Solo un motore gira
             if right:
-                self.motor_ruote.start(speed, -speed)
+                # Ruota solo il motore destro
+                self.motor_ruote.start(0, speed)
             else:
-                self.motor_ruote.start(-speed, speed)
+                # Ruota solo il motore sinistro
+                self.motor_ruote.start(speed, 0)
 
             sleep(duration)
             self.motor_ruote.stop()
