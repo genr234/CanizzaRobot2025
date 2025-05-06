@@ -319,10 +319,6 @@ def main_execution():
     try:
         robot.gira_sinistra(50, 10)
         robot.gira_destra(20, 10)
-        robot.muovi_indietro()
-        sleep(2)
-        robot.stop_movimento()
-        restart_program()
     except KeyboardInterrupt:
         log("Avvio shutdown da tastiera...", "SYSTEM")
         shutdown_flag.set()
