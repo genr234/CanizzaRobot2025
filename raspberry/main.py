@@ -120,9 +120,9 @@ except Exception as e:
     log(f"Errore inizializzazione hardware: {str(e)}", "ERROR")
     sys.exit(1)
 
-coloreLego = buildhat.ColorSensor('B')
+coloreLego = buildhat.ColorSensor('A')
 robot = Robot('C', 'D')
-gabbia = Motor('A')
+gabbia = Motor('B')
 
 # ========================
 # FUNZIONI DI EMERGENZA
