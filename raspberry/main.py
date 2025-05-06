@@ -287,7 +287,7 @@ def wait_for_start():
 
 def prendi_oggetto():
     retry_on_error(servo_gabbia.set_angle, 0)
-    gabbia.run_for_degrees(-90)
+    gabbia.run_for_degrees(-90, 100)
 
 def main_execution():
     """Funzione principale di esecuzione"""
@@ -326,7 +326,7 @@ def main_execution():
         sleep(2)
         prendi_oggetto()
         robot.muovi_avanti_for("seconds", 2)
-        robot.gira_destra(180, 100)
+        robot.gira_destra(180, 50)
         robot.muovi_indietro_for("rotations", 0.5)
         #robot.gira_destra(40, 40)
         """
