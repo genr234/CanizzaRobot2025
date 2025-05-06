@@ -287,7 +287,7 @@ def wait_for_start():
 
 def prendi_oggetto():
     retry_on_error(servo_gabbia.set_angle, 0)
-    gabbia.run_for_degrees(1880, 100)
+    gabbia.run_for_degrees(3000, 100)
 
 def main_execution():
     """Funzione principale di esecuzione"""
