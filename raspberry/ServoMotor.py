@@ -74,15 +74,6 @@ class ServoMotor:
         log(f"Inizializzato servomotore {self.command_code} ({min_angle}-{max_angle}°)", "SERVO")
 
     def _send_command(self, angle: int):
-        """Invio comando angolo con validazione e gestione errori avanzata
-
-        Args:
-            angle (int): Angolo target da impostare
-
-        Raises:
-            SensorError: In caso di errori di comunicazione o dati invalidi
-        """
-        # Validazione range angolo
         if not self.min_angle <= angle <= self.max_angle:
             err_msg = f"Angolo {angle}° fuori range consentito ({self.min_angle}-{self.max_angle}°)"
             log(err_msg, "ERROR")
@@ -93,33 +84,25 @@ class ServoMotor:
         for attempt in range(1, self.retries + 1):
             with self.lock:
                 try:
-                    # Pulizia buffer e invio comando
                     self.arduino.reset_output_buffer()
                     start_write = time()
                     self.arduino.write(full_cmd.encode())
-
-                    # Monitoraggio performance scrittura
                     write_time = time() - start_write
                     if write_time > 0.02:
                         log(f"Latenza scrittura elevata: {write_time:.3f}s", "WARN")
 
-                    # Lettura e interpretazione risposta
                     response_buffer = bytearray()
                     start_time = time()
                     response_received = False
                     servo_status = None
 
                     while (time() - start_time) < self.timeout:
-                        # Lettura chunk non bloccante
                         chunk = self.arduino.read(self.arduino.in_waiting or 1)
                         if chunk:
                             response_buffer.extend(chunk)
                             lines = response_buffer.split(b'\n')
-
-                            # Conserva dati parziali
                             response_buffer = lines[-1]
 
-                            # Processa linee complete
                             for line in lines[:-1]:
                                 decoded_line = line.decode(errors='ignore').strip()
                                 if decoded_line.startswith("SERVO|"):
@@ -133,13 +116,9 @@ class ServoMotor:
                         if response_received:
                             break
 
-                        # Attesa adattiva per ridurre CPU usage
                         sleep(max(0.001, self.timeout / 100))
 
-                    # Gestione risposta
-                    print(response_received)
-                    print(response_buffer)
-                    print(servo_status)
+                    print(response_received, response_buffer, servo_status)
                     if servo_status == "OK":
                         self._current_angle = angle
                         log(f"Angolo {angle}° confermato", "SERVO")
