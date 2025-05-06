@@ -137,6 +137,7 @@ class ServoMotor:
                         sleep(max(0.001, self.timeout / 100))
 
                     # Gestione risposta
+                    print(servo_status)
                     if servo_status == "OK":
                         self._current_angle = angle
                         log(f"Angolo {angle}° confermato", "SERVO")
