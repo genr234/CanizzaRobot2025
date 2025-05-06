@@ -36,7 +36,7 @@ TEMPO_TIMER = 180  # Durata timer sicurezza (secondi)
 SERIAL_PORT = '/dev/ttyACM0'
 BAUDRATE = 115200
 MAX_SERIAL_RETRIES = 5
-SERIAL_DELAY = 0.5  # Pausa tra tentativi (secondi)
+SERIAL_DELAY = 1  # Pausa tra tentativi (secondi)
 TIMEOUT_START = 5  # Timeout attesa comando start (secondi)
 
 # --------------------------
@@ -236,6 +236,18 @@ def handshake_arduino():
                 log("Handshake completato con successo", "SUCCESS")
                 return
             elif response != "":
+
+                if response == "SYS|3":
+                    log("Arduino non resettato correttamente", "WARN")
+                    sleep(0,1)
+                    log("Tentando un reset")
+                    arduino.setDTR(False)
+                    time.sleep(0.5)  # Wait a bit
+                    arduino.setDTR(True)
+                    log("Riavvio in corso...")
+                    sleep(2)
+                    log("Riavvio completato", "SUCCESS")
+
                 log(f"Risposta inattesa dall'handshake: {response}", "WARN")
         except Exception as e:
             log(f"Errore durante handshake: {str(e)}", "ERROR")
