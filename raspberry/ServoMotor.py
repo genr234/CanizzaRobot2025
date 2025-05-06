@@ -43,7 +43,7 @@ class ServoMotor:
             command_code: str,
             min_angle: int = 0,
             max_angle: int = 180,
-            timeout: float = 0.2,
+            timeout: float = 1,
             retries: int = 2
     ):
         """
