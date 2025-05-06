@@ -317,7 +317,8 @@ def main_execution():
     """
 
     try:
-        robot.gira_sinistra(90, 50)
+        robot.gira_sinistra(50, -50)
+        robot.muovi_indietro("rotations", 0.5)
         #robot.gira_destra(40, 40)
         """
         retry_on_error(servo_gabbia.set_angle, 179)
