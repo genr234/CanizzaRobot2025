@@ -322,7 +322,7 @@ def main_execution():
         retry_on_error(servo_gabbia.set_angle, 179)
         sleep(3)
         retry_on_error(servo_gabbia.set_angle, 1)
-        gabbia.run_for_degrees(90, speed=-gabbia.default_speed)
+        gabbia.run_for_degrees(90)
     except KeyboardInterrupt:
         log("Avvio shutdown da tastiera...", "SYSTEM")
         shutdown_flag.set()
