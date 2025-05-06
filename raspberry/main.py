@@ -187,7 +187,7 @@ def check_shutdown():
                 if len(buffer) > 300:
                     buffer = buffer[-300:]
             else:
-                sleep(0.005)
+                time.sleep(0.005)
         except Exception as e:
             log(f"Errore monitor shutdown: {str(e)}", "ERROR")
 
@@ -331,7 +331,9 @@ def main_execution():
                 arduino.write(b'3')  # Comando spegnimento Arduino
         except Exception as e:
             log(f"Errore invio comando shutdown: {str(e)}", "WARN")
-
+    finally:
+        safety_timer.cancel()
+        safety_thread.join()
 
 
 # ========================
@@ -350,6 +352,7 @@ def main():
         log(f"Errore critico: {str(e)}", "ERROR")
     finally:
         shutdown_flag.set()
+        shutdown_flag.wait()
 
         with serial_lock:
             try:
