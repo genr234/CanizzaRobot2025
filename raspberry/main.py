@@ -284,6 +284,11 @@ def wait_for_start():
 # ========================
 # LOGICA PRINCIPALE
 # ========================
+
+def prendi_oggetto():
+    retry_on_error(servo_gabbia.set_angle, 0)
+    gabbia.run_for_degrees(90)
+
 def main_execution():
     """Funzione principale di esecuzione"""
     log("Avvio modalità operativa", "SYSTEM")
@@ -317,14 +322,13 @@ def main_execution():
     """
 
     try:
+        servo_gabbia.set_angle(180)
+        prendi_oggetto()
         robot.gira_destra(180, 50)
         robot.muovi_indietro_for("rotations", 0.5)
         #robot.gira_destra(40, 40)
         """
-        retry_on_error(servo_gabbia.set_angle, 179)
-        sleep(3)
-        retry_on_error(servo_gabbia.set_angle, 1)
-        gabbia.run_for_degrees(90)"""
+        """
     except KeyboardInterrupt:
         log("Avvio shutdown da tastiera...", "SYSTEM")
         shutdown_flag.set()
