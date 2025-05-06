@@ -51,12 +51,16 @@ class ServoMotor:
         log(f"Inizializzato servomotore {self.command_code} ({min_angle}-{max_angle}°)", "SERVO")
 
     def _send_command(self, angle: int):
+        log(f"DEBUG VARIABILI: angle={angle}, min_angle={self.min_angle}, max_angle={self.max_angle}, "
+            f"command_code={self.command_code}, timeout={self.timeout}, retries={self.retries}", "DEBUG")
+
         if not self.min_angle <= angle <= self.max_angle:
             msg = f"Angolo {angle}° fuori range ({self.min_angle}-{self.max_angle}°)"
             log(msg, "ERROR")
             raise SensorError(SensorErrorType.INVALID_DATA, msg)
 
         full_cmd = f"{self.command_code}|{angle}\n"
+        log(f"DEBUG VARIABILI: full_cmd={repr(full_cmd)}", "DEBUG")
 
         for attempt in range(1, self.retries + 1):
             with self.lock:
@@ -70,12 +74,16 @@ class ServoMotor:
                     start_time = time()
                     while (time() - start_time) < self.timeout:
                         if self.arduino.in_waiting:
-                            response += self.arduino.read(self.arduino.in_waiting)
+                            chunk = self.arduino.read(self.arduino.in_waiting)
+                            log(f"DEBUG VARIABILI: chunk ricevuto={repr(chunk)}", "DEBUG")
+                            response += chunk
                             if b'\n' in response:
                                 break
                         sleep(0.005)
 
                     decoded_lines = response.decode(errors="ignore").split('\n')
+                    log(f"DEBUG VARIABILI: decoded_lines={decoded_lines}", "DEBUG")
+
                     for line in decoded_lines:
                         line = line.strip()
                         if not line:
@@ -84,6 +92,8 @@ class ServoMotor:
 
                         if line.startswith("SERVO|"):
                             status = line.split("|")[1]
+                            log(f"DEBUG VARIABILI: status={status}", "DEBUG")
+
                             if status == "OK":
                                 self._current_angle = angle
                                 log(f"Angolo {angle}° confermato", "SERVO")
@@ -96,6 +106,7 @@ class ServoMotor:
                                 log(f"Stato sconosciuto: {status}", "WARN")
                         else:
                             self._response_queue.put_nowait(line)
+                            log(f"DEBUG VARIABILI: risposta messa in coda: {line}", "DEBUG")
 
                 except serial.SerialException as e:
                     log(f"Errore comunicazione: {str(e)}", "ERROR")
