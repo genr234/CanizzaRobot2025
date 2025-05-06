@@ -84,51 +84,41 @@ class ServoMotor:
         for attempt in range(1, self.retries + 1):
             with self.lock:
                 try:
+                    self.arduino.reset_input_buffer()  # FLUSH input prima
                     self.arduino.reset_output_buffer()
-                    start_write = time()
                     self.arduino.write(full_cmd.encode())
-                    write_time = time() - start_write
-                    if write_time > 0.02:
-                        log(f"Latenza scrittura elevata: {write_time:.3f}s", "WARN")
+                    log(f"Comando inviato: {full_cmd.strip()}", "DEBUG")
 
-                    response_buffer = bytearray()
+                    response = b""
                     start_time = time()
-                    response_received = False
-                    servo_status = None
-
                     while (time() - start_time) < self.timeout:
-                        chunk = self.arduino.read(self.arduino.in_waiting or 1)
-                        if chunk:
-                            response_buffer.extend(chunk)
-                            lines = response_buffer.split(b'\n')
-                            response_buffer = lines[-1]
+                        if self.arduino.in_waiting:
+                            response += self.arduino.read(self.arduino.in_waiting)
+                            if b'\n' in response:
+                                break
+                        sleep(0.005)
 
-                            for line in lines[:-1]:
-                                decoded_line = line.decode(errors='ignore').strip()
-                                if decoded_line.startswith("SERVO|"):
-                                    response_received = True
-                                    parts = decoded_line.split('|')
-                                    servo_status = parts[1]
-                                    break
-                                elif decoded_line:
-                                    self._response_queue.put_nowait(decoded_line)
+                    decoded_lines = response.decode(errors="ignore").split('\n')
+                    for line in decoded_lines:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        log(f"Risposta ricevuta: {line}", "DEBUG")
 
-                        if response_received:
-                            break
-
-                        sleep(max(0.001, self.timeout / 100))
-
-                    print(response_received, response_buffer, servo_status)
-                    if servo_status == "OK":
-                        self._current_angle = angle
-                        log(f"Angolo {angle}° confermato", "SERVO")
-                        return
-                    elif servo_status == "-1":
-                        err_msg = f"Errore firmware per angolo {angle}°"
-                        log(err_msg, "ERROR")
-                        raise SensorError(SensorErrorType.INVALID_DATA, err_msg)
-                    else:
-                        log(f"Risposta non valida: {servo_status}", "WARN")
+                        if line.startswith("SERVO|"):
+                            status = line.split("|")[1]
+                            if status == "OK":
+                                self._current_angle = angle
+                                log(f"Angolo {angle}° confermato", "SERVO")
+                                return
+                            elif status == "-1":
+                                err_msg = f"Errore firmware per angolo {angle}°"
+                                log(err_msg, "ERROR")
+                                raise SensorError(SensorErrorType.INVALID_DATA, err_msg)
+                            else:
+                                log(f"Stato sconosciuto: {status}", "WARN")
+                        else:
+                            self._response_queue.put_nowait(line)
 
                 except serial.SerialException as e:
                     log(f"Errore comunicazione: {str(e)}", "ERROR")
