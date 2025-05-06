@@ -111,8 +111,8 @@ try:
     color1 = ColorSensorA(arduino, serial_lock, "COL1", "5")
     ultrasonic = UltrasonicSensor(arduino, serial_lock)
     ultrasonicLaterale = UltrasonicSensor(arduino, serial_lock, command_code="6", sensor_id="DIST2")
-    servo = ServoMotor(arduino, serial_lock, "SERVO1")
-    servo_alza = ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360)
+    servo_alza = ServoMotor(arduino, serial_lock, "SERVO1")
+    servo_gabbia = ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360)
 
 
 
@@ -319,9 +319,9 @@ def main_execution():
     try:
         #robot.gira_sinistra(90, 50)
         #robot.gira_destra(40, 40)
-        servo.set_angle(180)
+        servo_gabbia.set_angle(180)
         sleep(3)
-        servo.set_angle(0)
+        servo_gabbia.set_angle(0)
         gabbia.run_for_degrees(90, speed=-gabbia.default_speed)
     except KeyboardInterrupt:
         log("Avvio shutdown da tastiera...", "SYSTEM")

@@ -206,7 +206,7 @@ void loop() {
     else if (cmd.startsWith("SERVO1|")) {
       int angle = cmd.substring(7).toInt();
       
-      if (angle >= 0 && angle <= 180) {
+      if (angle >= 0 && angle <= 360) {
         servo.write(angle);
         Serial.println("SERVO|OK");
       } else {
@@ -215,7 +215,7 @@ void loop() {
     } else if (cmd.startsWith("SERVO2|")) {
       int angle = cmd.substring(7).toInt();
       
-      if (angle >= 0 && angle <= 360) {
+      if (angle >= 0 && angle <= 180) {
         servo2.write(angle);
         Serial.println("SERVO|OK");
       } else {
