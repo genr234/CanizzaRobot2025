@@ -36,7 +36,7 @@ TEMPO_TIMER = 180  # Durata timer sicurezza (secondi)
 SERIAL_PORT = '/dev/ttyACM0'
 BAUDRATE = 115200
 MAX_SERIAL_RETRIES = 5
-SERIAL_DELAY = 0.5  # Pausa tra tentativi (secondi)
+SERIAL_DELAY = 1  # Pausa tra tentativi (secondi)
 TIMEOUT_START = 5  # Timeout attesa comando start (secondi)
 
 # --------------------------
