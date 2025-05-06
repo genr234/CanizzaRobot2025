@@ -322,9 +322,9 @@ def main_execution():
     """
 
     try:
-        #servo_gabbia.set_angle(180)
-        #sleep(2)
-        #prendi_oggetto()
+        servo_gabbia.set_angle(180)
+        sleep(2)
+        prendi_oggetto()
         robot.muovi_avanti_for("seconds", 2)
         robot.gira_destra(180, 50)
         robot.muovi_indietro_for("rotations", 0.5)
