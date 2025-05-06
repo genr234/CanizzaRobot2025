@@ -187,7 +187,7 @@ def check_shutdown():
                 if len(buffer) > 300:
                     buffer = buffer[-300:]
             else:
-                time.sleep(0.005)
+                sleep(0.005)
         except Exception as e:
             log(f"Errore monitor shutdown: {str(e)}", "ERROR")
 
@@ -320,7 +320,7 @@ def main_execution():
         robot.gira_sinistra(50)
         robot.gira_destra(20)
         robot.muovi_indietro()
-        sleep(10)
+        sleep(2)
         robot.stop_movimento()
         restart_program()
     except KeyboardInterrupt:
