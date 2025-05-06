@@ -138,6 +138,7 @@ class ServoMotor:
 
                     # Gestione risposta
                     print(response_received)
+                    print(response_buffer)
                     print(servo_status)
                     if servo_status == "OK":
                         self._current_angle = angle
