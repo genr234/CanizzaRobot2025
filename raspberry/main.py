@@ -346,7 +346,10 @@ def main():
     try:
         handshake_arduino()
         #wait_for_start()
-        arduino.write(b'2')
+        while True:
+            arduino.write(b'2')
+            if arduino.read_all() == b"SYS|2":
+                break
         main_execution()
     except Exception as e:
         log(f"Errore critico: {str(e)}", "ERROR")
