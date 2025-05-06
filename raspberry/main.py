@@ -236,6 +236,18 @@ def handshake_arduino():
                 log("Handshake completato con successo", "SUCCESS")
                 return
             elif response != "":
+
+                if response == "SYS|3":
+                    log("Arduino non resettato correttamente", "WARN")
+                    sleep(0,1)
+                    log("Tentando un reset")
+                    arduino.setDTR(False)
+                    time.sleep(0.5)  # Wait a bit
+                    arduino.setDTR(True)
+                    log("Riavvio in corso...")
+                    sleep(2)
+                    log("Riavvio completato", "SUCCESS")
+
                 log(f"Risposta inattesa dall'handshake: {response}", "WARN")
         except Exception as e:
             log(f"Errore durante handshake: {str(e)}", "ERROR")
