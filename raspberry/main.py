@@ -120,7 +120,7 @@ except Exception as e:
     log(f"Errore inizializzazione hardware: {str(e)}", "ERROR")
     sys.exit(1)
 
-#coloreLego = buildhat.ColorSensor('A')
+coloreLego = buildhat.ColorSensor('A')
 robot = Robot('C', 'D')
 gabbia = Motor('B')
 
@@ -299,7 +299,7 @@ def wait_for_start():
 
 def prendi_oggetto():
     retry_on_error(servo_gabbia.set_angle, 0)
-    gabbia.run_for_degrees(5000, 100)
+    gabbia.run_for_degrees(3000, 100)
 
 def main_execution():
     """Funzione principale di esecuzione"""
