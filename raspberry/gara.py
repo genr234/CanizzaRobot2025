@@ -512,6 +512,30 @@ def main_execution():
         # Fermata sicura dei motori
         robot.stop_movimento()
 
+def inizializza_sensore(sensore, nome_sensore):
+    """Funzione per inizializzare un sensore e gestire eventuali errori.
+    
+    Args:
+        sensore: Il sensore da inizializzare.
+        nome_sensore (str): Il nome del sensore per il log.
+        
+    Returns:
+        sensore: Il sensore inizializzato o None se non riuscito.
+    """
+    try:
+        log(f"Inizializzazione sensore {nome_sensore}...", "INFO")
+        return sensore
+    except Exception as e:
+        log(f"Errore inizializzazione sensore {nome_sensore}: {str(e)}", "ERROR")
+        risposta = input(f"Il sensore {nome_sensore} non è stato rilevato. Vuoi continuare senza di esso? (y/n): ")
+        if risposta.lower() == 'y':
+            log(f"Bypassato sensore {nome_sensore}.", "WARN")
+            return None
+        else:
+            log(f"Interruzione a causa della mancata inizializzazione di {nome_sensore}.", "CRITICAL")
+            sys.exit(1)
+
+
 # --------------------------
 # ENTRY POINT
 # --------------------------
@@ -523,15 +547,16 @@ if __name__ == "__main__":
         # Inizializza la connessione seriale
         arduino = safe_serial_connect()
         
-        # Inizializza i sensori e gli attuatori
-        colorLego = buildhat.ColorSensor('B')
-        color1 = ColorSensorA(arduino, serial_lock, "COL1", "5")
-        ultrasonic = UltrasonicSensor(arduino, serial_lock)
-        ultrasonicLaterale = UltrasonicSensor(arduino, serial_lock, command_code="6", sensor_id="DIST2")
-        servo = ServoMotor(arduino, serial_lock, "SERVO1")
-        servo_alza = ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360)
+        # Inizializzazione dei sensori
+        colorLego = inizializza_sensore(buildhat.ColorSensor('B'), "ColorSensor")
+        color1 = inizializza_sensore(ColorSensorA(arduino, serial_lock, "COL1", "5"), "ColorSensorA")
+        ultrasonic = inizializza_sensore(UltrasonicSensor(arduino, serial_lock), "UltrasonicSensor")
+        ultrasonicLaterale = inizializza_sensore(UltrasonicSensor(arduino, serial_lock, command_code="6", sensor_id="DIST2"), "UltrasonicSensor Laterale")
+        servo = inizializza_sensore(ServoMotor(arduino, serial_lock, "SERVO1"), "ServoMotor 1")
+        servo_alza = inizializza_sensore(ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360), "ServoMotor 2")
         robot = Robot('C', 'D')
         gabbia = Motor('A')
+
         
         # Esegui la missione principale
         main_execution()
