@@ -548,7 +548,7 @@ if __name__ == "__main__":
         arduino = safe_serial_connect()
         
         # Inizializzazione dei sensori
-        colorLego = inizializza_sensore(buildhat.ColorSensor('B'), "ColorSensor")
+        colorLego = inizializza_sensore(buildhat.ColorSensor('A'), "ColorSensor")
         color1 = inizializza_sensore(ColorSensorA(arduino, serial_lock, "COL1", "5"), "ColorSensorA")
         ultrasonic = inizializza_sensore(UltrasonicSensor(arduino, serial_lock), "UltrasonicSensor")
         ultrasonicLaterale = inizializza_sensore(UltrasonicSensor(arduino, serial_lock, command_code="6", sensor_id="DIST2"), "UltrasonicSensor Laterale")
