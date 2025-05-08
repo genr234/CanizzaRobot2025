@@ -555,7 +555,7 @@ if __name__ == "__main__":
         servo = inizializza_sensore(ServoMotor(arduino, serial_lock, "SERVO1"), "ServoMotor 1")
         servo_alza = inizializza_sensore(ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360), "ServoMotor 2")
         robot = Robot('C', 'D')
-        gabbia = Motor('A')
+        gabbia = Motor('B')
 
         
         # Esegui la missione principale
