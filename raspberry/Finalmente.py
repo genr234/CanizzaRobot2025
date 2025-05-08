@@ -405,4 +405,4 @@ if __name__ == "__main__":
                 arduino.close()
         except Exception as e:
             log(f"Errore chiusura seriale: {str(e)}", "WARN")
-        log("Applicazione terminata", "SYSTEM")s
+        log("Applicazione terminata", "SYSTEM")
