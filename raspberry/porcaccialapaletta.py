@@ -155,16 +155,21 @@ def stop():
     robot.stop_movimento()
 
 def abbassa_gabbia():
-    """Abbassa la gabbia/pinza"""
-    log("Abbasso la gabbia", "INFO")
-    servo_alza.set_angle(90)  # Posizione abbassata
-    sleep(0.5)
+    """Abbassa la gabbia/pinza usando il motore nella porta B"""
+    log("Abbasso la gabbia usando Motor B", "INFO")
+    # Uso del motore per abbassare la gabbia
+    # Il valore positivo/negativo dipende dalla configurazione meccanica
+    gabbia.run_for_seconds(1, -50)  # Velocità negativa per abbassare
+    sleep(0.5)  # Pausa per stabilizzazione
 
 def alza_gabbia():
-    """Alza la gabbia/pinza"""
-    log("Alzo la gabbia", "INFO")
-    servo_alza.set_angle(0)  # Posizione alzata
-    sleep(0.5)
+    """Alza la gabbia/pinza usando il motore nella porta B"""
+    log("Alzo la gabbia usando Motor B", "INFO")
+    # Uso del motore per alzare la gabbia
+    # Il segno opposto rispetto all'abbassamento
+    gabbia.run_for_seconds(1, 50)  # Velocità positiva per alzare
+    sleep(0.5)  # Pausa per stabilizzazione
+
 
 def chiudi_gabbia():
     """Chiude la gabbia/pinza"""
@@ -351,17 +356,17 @@ def esegui_percorso():
     log("Inizio esecuzione percorso personalizzato", "SYSTEM")
     
     # Sequenza corretta con i nomi di funzione definiti
-    muovi_avanti(2, 40)         # Avanti per 2 secondi a velocità 40
-    gira_destra(90, 30)         # Gira a destra di 90 gradi
+    muovi_avanti(5, 80)         # Avanti per 2 secondi a velocità 40
+    gira_destra(90, 40)         # Gira a destra di 90 gradi
     muovi_avanti(1.5, 40)       # Avanti per 1.5 secondi
     abbassa_gabbia()            # Abbassa la gabbia
     chiudi_gabbia()             # Chiudi la pinza
     alza_gabbia()               # Alza la gabbia
-    gira_sinistra(90, 30)       # Gira a sinistra
-    muovi_avanti(3, 40)         # Avanti per 3 secondi
+    gira_sinistra(90, 40)       # Gira a sinistra
+    muovi_avanti(3, 80)         # Avanti per 3 secondi
     abbassa_gabbia()            # Abbassa per depositare
     apri_gabbia()               # Apri la pinza
-    muovi_indietro(1, 30)       # Indietro per allontanarsi
+    muovi_indietro(1, 50)       # Indietro per allontanarsi
     
     log("Percorso personalizzato completato", "SYSTEM")
 
