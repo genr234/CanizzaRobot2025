@@ -166,8 +166,9 @@ def handshake_arduino():
                 log(f"Risposta inattesa dall'handshake: {response}", "WARN")
         except Exception as e:
             log(f"Errore durante handshake: {str(e)}", "ERROR")
-            sleep(0.5)
-    termina_programma()
+            sleep(2)#0.5)
+    main_execution()
+    #termina_programma()
 
 def wait_for_start():
     """Attende comando di start da Arduino"""
