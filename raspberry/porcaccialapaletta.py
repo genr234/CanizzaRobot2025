@@ -342,6 +342,33 @@ def inizializza_sensore(sensore, nome_sensore):
             log(f"Interruzione a causa della mancata inizializzazione di {nome_sensore}.", "CRITICAL")
             sys.exit(1)
 
+# --------------------
+# PERCORSO
+# --------------------
+
+def esegui_percorso():
+    """Esegue un percorso personalizzato con una sequenza di movimenti"""
+    log("Inizio esecuzione percorso personalizzato", "SYSTEM")
+    
+    # Sequenza corretta con i nomi di funzione definiti
+    muovi_avanti(2, 40)         # Avanti per 2 secondi a velocità 40
+    gira_destra(90, 30)         # Gira a destra di 90 gradi
+    muovi_avanti(1.5, 40)       # Avanti per 1.5 secondi
+    abbassa_gabbia()            # Abbassa la gabbia
+    chiudi_gabbia()             # Chiudi la pinza
+    alza_gabbia()               # Alza la gabbia
+    gira_sinistra(90, 30)       # Gira a sinistra
+    muovi_avanti(3, 40)         # Avanti per 3 secondi
+    abbassa_gabbia()            # Abbassa per depositare
+    apri_gabbia()               # Apri la pinza
+    muovi_indietro(1, 30)       # Indietro per allontanarsi
+    
+    log("Percorso personalizzato completato", "SYSTEM")
+
+
+
+
+
 # --------------------------
 # ENTRY POINT
 # --------------------------
@@ -380,24 +407,3 @@ if __name__ == "__main__":
             log(f"Errore chiusura seriale: {str(e)}", "WARN")
         
         log("Applicazione terminata", "SYSTEM")
-
-def esegui_percorso():
-    """Esegue un percorso personalizzato con una sequenza di movimenti"""
-    log("Inizio esecuzione percorso personalizzato", "SYSTEM")
-    
-    # Qui inserisci la tua sequenza di movimenti
-    # Esempio di percorso (modifica secondo le tue necessità):
-    avanti(2, 40)             # Avanti per 2 secondi a velocità 40
-    destra(90, 30)            # Gira a destra di 90 gradi
-    avanti(1.5, 40)           # Avanti per 1.5 secondi
-    abbassa()                 # Abbassa la gabbia
-    chiudi()                  # Chiudi la pinza
-    alza()                    # Alza la gabbia
-    sinistra(90, 30)          # Gira a sinistra
-    avanti(3, 40)             # Avanti per 3 secondi
-    abbassa()                 # Abbassa per depositare
-    apri()                    # Apri la pinza
-    indietro(1, 30)           # Indietro per allontanarsi
-    
-    log("Percorso personalizzato completato", "SYSTEM")
-
