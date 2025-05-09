@@ -35,7 +35,7 @@ SERIAL_PORT = '/dev/ttyACM0'
 BAUDRATE = 115200
 MAX_SERIAL_RETRIES = 5
 SERIAL_DELAY = 0.5  # Pausa tra tentativi (secondi)
-TIMEOUT_START = 5  # Timeout attesa comando start (secondi)
+STARTUP_DELAY = 4   # Ritardo di avvio automatico (secondi)
 
 # --------------------------
 # CONFIGURAZIONE LOGGER
@@ -48,6 +48,7 @@ COLORI_LOG = {
     "CRITICAL": Fore.RED + Style.BRIGHT,
     "SYSTEM": Fore.MAGENTA,
     "PARKING": Fore.BLUE + Style.BRIGHT,
+    "SUCCESS": Fore.GREEN + Style.BRIGHT,
 }
 
 # --------------------------
@@ -93,6 +94,18 @@ shutdown_flag = threading.Event()
 officina_attiva = OfficineColor.SCONOSCIUTO
 eventi = queue.Queue()
 
+# Inizializzazione delle variabili per i sensori e attuatori
+# Saranno definite correttamente durante l'inizializzazione
+robot = None
+colorLego = None
+color1 = None
+ultrasonic = None
+ultrasonicLaterale = None
+servo = None
+servo_alza = None
+gabbia = None
+arduino = None
+
 # --------------------------
 # FUNZIONI DI UTILITY
 # --------------------------
@@ -131,74 +144,23 @@ def safe_serial_connect(port=SERIAL_PORT, baud=BAUDRATE, timeout=1.5):
 
 def termina_programma():
     """Spegne il sistema in modo controllato"""
+    global robot, arduino
+    
     log("Avvio shutdown programmato...", "SYSTEM")
     shutdown_flag.set()
     
     try:
-        robot.stop_movimento()
+        if robot is not None:
+            robot.stop_movimento()
         
         with serial_lock:
-            arduino.write(b'3\n')  # Comando spegnimento Arduino
-            arduino.flush()
+            if arduino is not None and arduino.is_open:
+                arduino.write(b'3\n')  # Comando spegnimento Arduino
+                arduino.flush()
     except Exception as e:
         log(f"Errore invio comando shutdown: {str(e)}", "WARN")
     
     sys.exit(0)
-    
-# --------------------------
-# HANDSHAKE E START COMMAND
-# --------------------------
-def handshake_arduino():
-    """Esegue handshake iniziale con Arduino"""
-    log("Avvio procedura handshake...", "SYSTEM")
-    while not shutdown_flag.is_set():
-        try:
-            with serial_lock:
-                arduino.reset_input_buffer()
-                arduino.write(b'1\n')
-                arduino.flush()
-                response = arduino.read_until(b'SYS|1\n').decode().strip()
-
-            if response == "SYS|1":
-                log("Handshake completato con successo", "SUCCESS")
-                return
-            elif response != "":
-                log(f"Risposta inattesa dall'handshake: {response}", "WARN")
-        except Exception as e:
-            log(f"Errore durante handshake: {str(e)}", "ERROR")
-            sleep(2)#0.5)
-    main_execution()
-    #termina_programma()
-
-def wait_for_start():
-    """Attende comando di start da Arduino"""
-    log("In attesa comando START...", "SYSTEM")
-    buffer = bytearray()
-    start_time = time()
-    while not shutdown_flag.is_set():
-        try:
-            with serial_lock:
-                data = arduino.read(arduino.in_waiting or 1)
-
-            if data:
-                buffer.extend(data)
-
-                while b"\n" in buffer:
-                    line, _, buffer = buffer.partition(b"\n")
-                    if b"SYS|2" in line:
-                        log("Ricevuto comando START", "SUCCESS")
-                        return
-                if len(buffer) > 300:
-                    buffer = buffer[-300:]
-            else:
-                sleep(0.005)
-
-            if time() - start_time > TIMEOUT_START:
-                log("Timeout attesa comando START", "ERROR")
-                termina_programma()
-        except Exception as e:
-            log(f"Errore durante l'attesa START: {str(e)}", "ERROR")
-            termina_programma()
 
 # --------------------------
 # FUNZIONI DI RILEVAMENTO E MOVIMENTO
@@ -209,39 +171,46 @@ def identifica_colore_officina():
     Returns:
         OfficineColor: Colore dell'officina attiva
     """
+    global servo, colorLego
+    
     log("Rilevamento colore officina disponibile...", "PARKING")
     
     # Utilizziamo il sensore di colore Arduino per leggere il colore della parete
     try:
         # Posiziona il sensore verso la parete
-        servo.set_angle(90)  # Orienta il servo verso la parete
-        sleep(0.5)  # Attendi stabilizzazione
+        if servo is not None:
+            servo.set_angle(90)  # Orienta il servo verso la parete
+            sleep(0.5)  # Attendi stabilizzazione
         
         # Leggi il colore con il sensore
-        rgb = colorLego.get_color()
-        log(f"RGB officina rilevato: {rgb}", "DEBUG")
-        
-        # Identifica il colore
-        if is_color(rgb, "verde"):
-            log("Officina VERDE attiva", "PARKING")
-            return OfficineColor.VERDE
-        elif is_color(rgb, "giallo"):
-            log("Officina GIALLA attiva", "PARKING")
-            return OfficineColor.GIALLO
-        else:
-            # Seconda lettura in caso di errore
-            sleep(0.2)
+        if colorLego is not None:
             rgb = colorLego.get_color()
+            log(f"RGB officina rilevato: {rgb}", "DEBUG")
             
+            # Identifica il colore
             if is_color(rgb, "verde"):
-                log("Officina VERDE attiva (seconda lettura)", "PARKING")
+                log("Officina VERDE attiva", "PARKING")
                 return OfficineColor.VERDE
             elif is_color(rgb, "giallo"):
-                log("Officina GIALLA attiva (seconda lettura)", "PARKING")
+                log("Officina GIALLA attiva", "PARKING")
                 return OfficineColor.GIALLO
             else:
-                log("Impossibile identificare colore officina, default: VERDE", "WARN")
-                return OfficineColor.VERDE
+                # Seconda lettura in caso di errore
+                sleep(0.2)
+                rgb = colorLego.get_color()
+                
+                if is_color(rgb, "verde"):
+                    log("Officina VERDE attiva (seconda lettura)", "PARKING")
+                    return OfficineColor.VERDE
+                elif is_color(rgb, "giallo"):
+                    log("Officina GIALLA attiva (seconda lettura)", "PARKING")
+                    return OfficineColor.GIALLO
+                else:
+                    log("Impossibile identificare colore officina, default: VERDE", "WARN")
+                    return OfficineColor.VERDE
+        else:
+            log("Sensore colore non disponibile, default: VERDE", "WARN")
+            return OfficineColor.VERDE
     
     except Exception as e:
         log(f"Errore identificazione officina: {str(e)}", "ERROR")
@@ -276,29 +245,20 @@ def identifica_colore_auto():
     Returns:
         AutoColor: Colore dell'auto identificata
     """
+    global servo, colorLego
+    
     try:
         # Posiziona il sensore per leggere il colore dell'auto
-        servo.set_angle(0)  # Orienta il servo verso l'auto
-        sleep(0.3)  # Attendi stabilizzazione
+        if servo is not None:
+            servo.set_angle(0)  # Orienta il servo verso l'auto
+            sleep(0.3)  # Attendi stabilizzazione
         
         # Leggi il colore con il sensore
-        rgb = colorLego.get_color()
-        log(f"RGB auto rilevato: {rgb}", "DEBUG")
-        
-        # Identifica il colore
-        if is_color(rgb, "rosso"):
-            return AutoColor.ROSSO
-        elif is_color(rgb, "verde"):
-            return AutoColor.VERDE
-        elif is_color(rgb, "giallo"):
-            return AutoColor.GIALLO
-        elif is_color(rgb, "blu"):
-            return AutoColor.BLU
-        else:
-            # Seconda lettura in caso di errore
-            sleep(0.2)
+        if colorLego is not None:
             rgb = colorLego.get_color()
+            log(f"RGB auto rilevato: {rgb}", "DEBUG")
             
+            # Identifica il colore
             if is_color(rgb, "rosso"):
                 return AutoColor.ROSSO
             elif is_color(rgb, "verde"):
@@ -307,9 +267,25 @@ def identifica_colore_auto():
                 return AutoColor.GIALLO
             elif is_color(rgb, "blu"):
                 return AutoColor.BLU
+            else:
+                # Seconda lettura in caso di errore
+                sleep(0.2)
+                rgb = colorLego.get_color()
+                
+                if is_color(rgb, "rosso"):
+                    return AutoColor.ROSSO
+                elif is_color(rgb, "verde"):
+                    return AutoColor.VERDE
+                elif is_color(rgb, "giallo"):
+                    return AutoColor.GIALLO
+                elif is_color(rgb, "blu"):
+                    return AutoColor.BLU
             
-        log("Colore auto non identificato", "WARN")
-        return AutoColor.SCONOSCIUTO
+            log("Colore auto non identificato", "WARN")
+            return AutoColor.SCONOSCIUTO
+        else:
+            log("Sensore colore non disponibile, default: ROSSO", "WARN")
+            return AutoColor.ROSSO
     
     except Exception as e:
         log(f"Errore identificazione auto: {str(e)}", "ERROR")
@@ -321,6 +297,12 @@ def muovi_a_posizione(destinazione):
     Args:
         destinazione (str): Nome della posizione di destinazione
     """
+    global robot
+    
+    if robot is None:
+        log("Robot non inizializzato, impossibile muoversi", "ERROR")
+        return
+    
     log(f"Movimento verso: {destinazione}", "PARKING")
     
     # Implementazione semplificata - in un robot reale utilizzeremmo
@@ -374,13 +356,22 @@ def muovi_a_posizione(destinazione):
 
 def evita_ostacolo():
     """Implementa la logica per evitare un ostacolo rilevato"""
+    global robot, ultrasonicLaterale
+    
     log("Rilevato ostacolo, avvio manovra evasiva", "WARN")
+    
+    # Verifica che il robot sia inizializzato
+    if robot is None:
+        log("Robot non inizializzato, impossibile evitare ostacolo", "ERROR")
+        return
     
     # Ferma il robot
     robot.stop_movimento()
     
     # Verifica la distanza laterale
-    distanza_laterale = ultrasonicLaterale.get_distance()
+    distanza_laterale = 30  # Default se sensore non disponibile
+    if ultrasonicLaterale is not None:
+        distanza_laterale = ultrasonicLaterale.get_distance()
     
     if distanza_laterale > 20:  # Se c'è spazio a sinistra
         # Manovra di aggiramento a sinistra
@@ -405,42 +396,53 @@ def evita_ostacolo():
 
 def prendi_auto():
     """Effettua la manovra per prendere un'auto"""
+    global servo_alza, gabbia
+    
     log("Prelievo auto in corso...", "PARKING")
     
     # Abbassiamo la gabbia/pinza per prendere l'auto
-    servo_alza.set_angle(90)  # Posizione abbassata
-    sleep(0.5)
+    if servo_alza is not None:
+        servo_alza.set_angle(90)  # Posizione abbassata
+        sleep(0.5)
     
     # Chiusura pinza/gabbia 
-    gabbia.run_for_seconds(1, 50)
+    if gabbia is not None:
+        gabbia.run_for_seconds(1, 50)
     
     log("Auto prelevata con successo", "PARKING")
 
 def rilascia_auto():
     """Effettua la manovra per rilasciare un'auto"""
+    global servo_alza, gabbia
+    
     log("Rilascio auto in corso...", "PARKING")
     
     # Apertura pinza/gabbia
-    gabbia.run_for_seconds(1, -50)
+    if gabbia is not None:
+        gabbia.run_for_seconds(1, -50)
     
     # Alziamo la gabbia/pinza
-    servo_alza.set_angle(0)  # Posizione alzata
-    sleep(0.5)
+    if servo_alza is not None:
+        servo_alza.set_angle(0)  # Posizione alzata
+        sleep(0.5)
     
     log("Auto rilasciata con successo", "PARKING")
 
 def sensore_ostacoli():
     """Thread di monitoraggio degli ostacoli"""
+    global ultrasonic, eventi, shutdown_flag
+    
     log("Avvio sensore ostacoli", "SYSTEM")
     
     while not shutdown_flag.is_set():
         try:
-            # Leggi la distanza frontale
-            distanza = ultrasonic.get_distance()
-            
-            # Se la distanza è inferiore a una soglia, segnala un ostacolo
-            if distanza < 15:  # 15 cm come soglia di sicurezza
-                eventi.put("ostacolo")
+            # Leggi la distanza frontale se il sensore è disponibile
+            if ultrasonic is not None:
+                distanza = ultrasonic.get_distance()
+                
+                # Se la distanza è inferiore a una soglia, segnala un ostacolo
+                if distanza < 15:  # 15 cm come soglia di sicurezza
+                    eventi.put("ostacolo")
             
             # Pausa breve per non saturare il sistema
             sleep(0.1)
@@ -451,6 +453,8 @@ def sensore_ostacoli():
 
 def controlla_ostacoli():
     """Verifica la presenza di ostacoli nella coda eventi"""
+    global eventi
+    
     try:
         evento = eventi.get_nowait()
         if evento == "ostacolo":
@@ -467,7 +471,7 @@ def controlla_ostacoli():
 # --------------------------
 def main_execution():
     """Funzione principale di esecuzione"""
-    global officina_attiva
+    global officina_attiva, robot
     
     # Configurazione iniziale
     log("Avvio missione Smart Parking", "SYSTEM")
@@ -483,6 +487,11 @@ def main_execution():
     safety_timer.start()
     
     try:
+        # Verifica che il robot sia stato inizializzato
+        if robot is None:
+            log("Robot non inizializzato, impossibile eseguire la missione", "CRITICAL")
+            return
+        
         # 1. Identificazione dell'officina attiva
         officina_attiva = identifica_colore_officina()
         
@@ -566,7 +575,8 @@ def main_execution():
     
     finally:
         # Fermata sicura dei motori
-        robot.stop_movimento()
+        if robot is not None:
+            robot.stop_movimento()
 
 def inizializza_sensore(sensore, nome_sensore):
     """Funzione per inizializzare un sensore e gestire eventuali errori.
@@ -591,6 +601,33 @@ def inizializza_sensore(sensore, nome_sensore):
             log(f"Interruzione a causa della mancata inizializzazione di {nome_sensore}.", "CRITICAL")
             sys.exit(1)
 
+# --------------------------
+# INIZIALIZZAZIONE E AVVIO
+# --------------------------
+def inizializza_sistema():
+    """Inizializza tutti i componenti del sistema"""
+    global robot, colorLego, color1, ultrasonic, ultrasonicLaterale, servo, servo_alza, gabbia, arduino
+    
+    try:
+        # Inizializza la connessione seriale
+        arduino = safe_serial_connect()
+        
+        # Inizializzazione dei sensori
+        colorLego = inizializza_sensore(buildhat.ColorSensor('A'), "ColorSensor")
+        color1 = inizializza_sensore(ColorSensorA(arduino, serial_lock, "COL1", "5"), "ColorSensorA")
+        ultrasonic = inizializza_sensore(UltrasonicSensor(arduino, serial_lock), "UltrasonicSensor")
+        ultrasonicLaterale = inizializza_sensore(UltrasonicSensor(arduino, serial_lock, command_code="6", sensor_id="DIST2"), "UltrasonicSensor Laterale")
+        servo = inizializza_sensore(ServoMotor(arduino, serial_lock, "SERVO1"), "ServoMotor 1")
+        servo_alza = inizializza_sensore(ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360), "ServoMotor 2")
+        robot = inizializza_sensore(Robot('C', 'D'), "Robot")
+        gabbia = inizializza_sensore(Motor('B'), "Motore gabbia")
+        
+        log("Inizializzazione sistema completata", "SYSTEM")
+        return True
+    
+    except Exception as e:
+        log(f"Errore inizializzazione sistema: {str(e)}", "CRITICAL")
+        return False
 
 # --------------------------
 # ENTRY POINT
@@ -599,26 +636,19 @@ if __name__ == "__main__":
     # Cattura il segnale di interruzione
     signal.signal(signal.SIGINT, lambda s, f: termina_programma())
     
+    # Messaggio di avvio
+    log(f"Avvio automatico tra {STARTUP_DELAY} secondi...", "SYSTEM")
+    
+    # Ritardo di avvio
+    sleep(STARTUP_DELAY)
+    
     try:
-        # Inizializza la connessione seriale
-        arduino = safe_serial_connect()
-        # Handshake e attesa del comando di start
-        handshake_arduino()
-        wait_for_start()
-        
-        # Inizializzazione dei sensori
-        colorLego = inizializza_sensore(buildhat.ColorSensor('B'), "ColorSensor")
-        color1 = inizializza_sensore(ColorSensorA(arduino, serial_lock, "COL1", "5"), "ColorSensorA")
-        ultrasonic = inizializza_sensore(UltrasonicSensor(arduino, serial_lock), "UltrasonicSensor")
-        ultrasonicLaterale = inizializza_sensore(UltrasonicSensor(arduino, serial_lock, command_code="6", sensor_id="DIST2"), "UltrasonicSensor Laterale")
-        servo = inizializza_sensore(ServoMotor(arduino, serial_lock, "SERVO1"), "ServoMotor 1")
-        servo_alza = inizializza_sensore(ServoMotor(arduino, serial_lock, "SERVO2", min_angle=0, max_angle=360), "ServoMotor 2")
-        robot = Robot('C', 'D')
-        gabbia = Motor('A')
-
-        
-        # Esegui la missione principale
-        main_execution()
+        # Inizializza il sistema
+        if inizializza_sistema():
+            # Esegui la missione principale
+            main_execution()
+        else:
+            log("Impossibile inizializzare il sistema, programma terminato", "CRITICAL")
         
     except Exception as e:
         log(f"Errore critico: {str(e)}", "CRITICAL")
@@ -628,7 +658,7 @@ if __name__ == "__main__":
         shutdown_flag.set()
         
         try:
-            if 'arduino' in locals() and arduino.is_open:
+            if 'arduino' in locals() and arduino is not None and arduino.is_open:
                 arduino.close()
         except Exception as e:
             log(f"Errore chiusura seriale: {str(e)}", "WARN")
