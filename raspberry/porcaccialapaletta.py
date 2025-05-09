@@ -352,11 +352,42 @@ def inizializza_sensore(sensore, nome_sensore):
 # --------------------
 
 def esegui_percorso():
-    """Esegue un percorso personalizzato con una sequenza di movimenti"""
+    """Esegue un percorso personalizzato con un sensore di colore Arduino per fermarsi sul rosso"""
     log("Inizio esecuzione percorso personalizzato", "SYSTEM")
     
-    # Sequenza corretta con i nomi di funzione definiti
-    muovi_avanti(5, 80)         # Avanti per 2 secondi a velocità 40
+    # Avanza finché non trova il rosso
+    log("Avanzo fino a rilevare il colore ROSSO con il sensore Arduino", "PARKING")
+    
+    # Avvia il movimento in avanti a velocità moderata
+    robot.muovi_avanti(speed=40)
+    
+    # Loop di controllo colore
+    colore_trovato = False
+    while not colore_trovato and not shutdown_flag.is_set():
+        try:
+            # Leggi il colore dal sensore Arduino
+            colore = color1.get_color()  # Usando color1 (Arduino) invece di colorLego (porta A)
+            log(f"Colore rilevato da Arduino: {colore}", "INFO")
+            
+            # Verifica se è rosso (adatta questa logica in base a come color1 riporta i colori)
+            if colore == "RED" or colore == "ROSSO" or (isinstance(colore, tuple) and colore[0] > 150 and colore[1] < 80 and colore[2] < 80):
+                log("COLORE ROSSO RILEVATO! Mi fermo.", "PARKING")
+                colore_trovato = True
+                robot.stop_movimento()
+            else:
+                # Breve attesa per non sovraccaricare la lettura
+                sleep(0.1)
+        except Exception as e:
+            log(f"Errore durante la lettura del colore: {str(e)}", "ERROR")
+            sleep(0.5)  # Pausa più lunga in caso di errore
+    
+    # Se non ha trovato il rosso ma è uscito per shutdown, ferma il robot
+    if not colore_trovato:
+        robot.stop_movimento()
+        log("Percorso interrotto senza trovare il rosso", "WARN")
+        return
+    
+    # Prosegui con il resto del percorso
     gira_destra(90, 40)         # Gira a destra di 90 gradi
     muovi_avanti(1.5, 40)       # Avanti per 1.5 secondi
     abbassa_gabbia()            # Abbassa la gabbia
@@ -369,6 +400,7 @@ def esegui_percorso():
     muovi_indietro(1, 50)       # Indietro per allontanarsi
     
     log("Percorso personalizzato completato", "SYSTEM")
+
 
 
 
