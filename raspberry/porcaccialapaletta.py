@@ -159,7 +159,7 @@ def abbassa_gabbia():
     log("Abbasso la gabbia usando Motor B", "INFO")
     # Uso del motore per abbassare la gabbia
     # Il valore positivo/negativo dipende dalla configurazione meccanica
-    gabbia.run_for_seconds(90, -100)  # Velocità negativa per abbassare
+    gabbia.run_for_seconds(5, -80)  # Velocità negativa per abbassare
     sleep(0.5)  # Pausa per stabilizzazione
 
 def alza_gabbia():
@@ -167,7 +167,7 @@ def alza_gabbia():
     log("Alzo la gabbia usando Motor B", "INFO")
     # Uso del motore per alzare la gabbia
     # Il segno opposto rispetto all'abbassamento
-    gabbia.run_for_seconds(90, 100)  # Velocità positiva per alzare
+    gabbia.run_for_seconds(5, 80)  # Velocità positiva per alzare
     sleep(0.5)  # Pausa per stabilizzazione
 
 
