@@ -16,12 +16,12 @@ import queue
 import serial
 import buildhat
 from colorama import Fore, Style, init as colorama_init
+from buildhat import Motor, ColorSensor
 
 # Importazione moduli interni
 from ColorSensorA import ColorSensorA
 from ServoMotor import ServoMotor
 from UltrasonicSensor import UltrasonicSensor
-from buildhat import Motor, ColorSensor
 from robot import Robot
 
 # Inizializzazione colorama per colori cross-platform
