@@ -35,6 +35,7 @@ SERIAL_PORT = '/dev/ttyACM0'
 BAUDRATE = 115200
 MAX_SERIAL_RETRIES = 5
 SERIAL_DELAY = 0.5  # Pausa tra tentativi (secondi)
+TIMEOUT_START = 5  # Timeout attesa comando start (secondi)
 
 # --------------------------
 # CONFIGURAZIONE LOGGER
@@ -143,6 +144,60 @@ def termina_programma():
         log(f"Errore invio comando shutdown: {str(e)}", "WARN")
     
     sys.exit(0)
+    
+# --------------------------
+# HANDSHAKE E START COMMAND
+# --------------------------
+def handshake_arduino():
+    """Esegue handshake iniziale con Arduino"""
+    log("Avvio procedura handshake...", "SYSTEM")
+    while not shutdown_flag.is_set():
+        try:
+            with serial_lock:
+                arduino.reset_input_buffer()
+                arduino.write(b'1\n')
+                arduino.flush()
+                response = arduino.read_until(b'SYS|1\n').decode().strip()
+
+            if response == "SYS|1":
+                log("Handshake completato con successo", "SUCCESS")
+                return
+            elif response != "":
+                log(f"Risposta inattesa dall'handshake: {response}", "WARN")
+        except Exception as e:
+            log(f"Errore durante handshake: {str(e)}", "ERROR")
+            sleep(0.5)
+    termina_programma()
+
+def wait_for_start():
+    """Attende comando di start da Arduino"""
+    log("In attesa comando START...", "SYSTEM")
+    buffer = bytearray()
+    start_time = time()
+    while not shutdown_flag.is_set():
+        try:
+            with serial_lock:
+                data = arduino.read(arduino.in_waiting or 1)
+
+            if data:
+                buffer.extend(data)
+
+                while b"\n" in buffer:
+                    line, _, buffer = buffer.partition(b"\n")
+                    if b"SYS|2" in line:
+                        log("Ricevuto comando START", "SUCCESS")
+                        return
+                if len(buffer) > 300:
+                    buffer = buffer[-300:]
+            else:
+                sleep(0.005)
+
+            if time() - start_time > TIMEOUT_START:
+                log("Timeout attesa comando START", "ERROR")
+                termina_programma()
+        except Exception as e:
+            log(f"Errore durante l'attesa START: {str(e)}", "ERROR")
+            termina_programma()
 
 # --------------------------
 # FUNZIONI DI RILEVAMENTO E MOVIMENTO
@@ -546,6 +601,9 @@ if __name__ == "__main__":
     try:
         # Inizializza la connessione seriale
         arduino = safe_serial_connect()
+        # Handshake e attesa del comando di start
+        handshake_arduino()
+        wait_for_start()
         
         # Inizializzazione dei sensori
         colorLego = inizializza_sensore(buildhat.ColorSensor('B'), "ColorSensor")
