@@ -370,7 +370,7 @@ def esegui_percorso():
             log(f"Colore rilevato da Arduino: {colore}", "INFO")
             
             # Verifica se è rosso (adatta questa logica in base a come color1 riporta i colori)
-            if colore.UPPER == "RED" or colore.UPPER == "ROSSO" or (isinstance(colore, tuple) and colore[0] > 150 and colore[1] < 80 and colore[2] < 80):
+            if str(colore).upper() == "RED" or str(colore).upper() == "ROSSO" or (isinstance(colore, tuple) and colore[0] > 150 and colore[1] < 80 and colore[2] < 80):
                 log("COLORE ROSSO RILEVATO! Mi fermo.", "PARKING")
                 colore_trovato = True
                 muovi_avanti(1, 40)
