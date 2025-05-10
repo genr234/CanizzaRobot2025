@@ -16,10 +16,13 @@
 #define ECHO2_ULTRASONIC_PIN 5
 
 // Soglie primo sensore
-#define WHITE_THRESHOLD 60
-#define RED_THRESHOLD 100
-#define BLUE_THRESHOLD 80
-#define DARK_THRESHOLD 110
+#define WHITE_THRESHOLD 50         // ipotetico per bianco
+#define RED_R_MAX 70               // R < 70
+#define RED_G_MIN 90               // G > 90
+#define RED_B_MIN 75               // B > 75
+#define DARK_R_MIN 100             // R > 100
+#define DARK_G_MIN 95              // G > 90
+#define DARK_B_MIN 55  
 
 // Soglie secondo sensore
 #define WHITE_THRESHOLD_2 15
@@ -91,16 +94,24 @@ String rilevaColore() {
   int g = readColorMode('G');
   int b = readColorMode('B');
 
+  // BIANCO = tutti bassi (tanta luce riflessa)
   if (r < WHITE_THRESHOLD && g < WHITE_THRESHOLD && b < WHITE_THRESHOLD) {
-    return "1"; //BIANCO
-  } else if (r < RED_THRESHOLD && g > RED_THRESHOLD && b > BLUE_THRESHOLD) {
-    return "2"; //ROSSO
-  } else if ((r > DARK_THRESHOLD || g > DARK_THRESHOLD || b > DARK_THRESHOLD) && 
-             (r < 140 || g < 140 || b < 140)) {
-    return "3"; //SCURO
-  } else {
-    return "0"; //SCONOSCIUTO
+    return "1"; // BIANCO
   }
+
+  // Rileva ROSSO (basso R, alti G e B)
+  else if (r < RED_R_MAX && g > RED_G_MIN && b > RED_B_MIN) {
+    return "2"; // ROSSO
+  }
+
+  // Rileva SCURO (nero/blu) se almeno due dei valori sono sopra soglia
+  else if ((r > DARK_R_MIN && g > DARK_G_MIN) ||
+           (r > DARK_R_MIN && b > DARK_B_MIN) ||
+           (g > DARK_G_MIN && b > DARK_B_MIN)) {
+    return "3"; // SCURO
+  }
+
+  return "0"; // SCONOSCIUTO
 }
 
 String distanza(int TRIG, int ECHO){

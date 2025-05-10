@@ -370,10 +370,10 @@ def esegui_percorso():
             log(f"Colore rilevato da Arduino: {colore}", "INFO")
             
             # Verifica se è rosso (adatta questa logica in base a come color1 riporta i colori)
-            if colore == "RED" or colore == "ROSSO" or (isinstance(colore, tuple) and colore[0] > 150 and colore[1] < 80 and colore[2] < 80):
+            if colore.UPPER == "RED" or colore.UPPER == "ROSSO" or (isinstance(colore, tuple) and colore[0] > 150 and colore[1] < 80 and colore[2] < 80):
                 log("COLORE ROSSO RILEVATO! Mi fermo.", "PARKING")
                 colore_trovato = True
-                robot.stop_movimento()
+                muovi_avanti(1, 40)
             else:
                 # Breve attesa per non sovraccaricare la lettura
                 sleep(0.1)
